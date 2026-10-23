@@ -44,7 +44,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Local agent handoff documents — not part of the app
+# Local agent handoff documents, not part of the app
 FRONTEND-MASTER-PROMPT.md
 FRONTEND-CONTRACT.md
 syncare-mvp-proposal-flutter.md

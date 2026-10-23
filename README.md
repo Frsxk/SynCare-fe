@@ -1,12 +1,12 @@
-# SynCare — Flutter client
+# SynCare: Flutter client
 
 Mobile client (Android + iOS) for SynCare, a risk-adaptive post-discharge follow-up demo for CHF
 patients. Two personas share one app, selected at entry:
 
-- **Patient** — check in, read the approved plan, ask grounded questions.
-- **Nurse / clinician** — score a discharge summary, draft a plan, and run the human-approval desk.
+- **Patient:** check in, read the approved plan, ask grounded questions.
+- **Nurse / clinician:** score a discharge summary, draft a plan, and run the human-approval desk.
 
-The clinical brain stays in Langflow behind `SynCare-be`. This client renders what the API returns;
+Langflow makes every clinical decision behind `SynCare-be`. This client renders what the API returns;
 it never scores, tiers, flags, drafts, or approves on its own.
 
 <p align="center">
@@ -37,8 +37,8 @@ above everything else.
 
 **My plan** (`GET /api/v1/plans/:patientId`) shows the approved plan, risk badge, care intensity,
 follow-up date/hotline extracted from the ServiceRequest sentence, and the approval timestamp.
-A `404` is an honest "belum ada rencana" empty state. `plan_json.status` stays
-`DRAFT pending human approval` by design — approval is the row existing, never that string.
+A `404` renders the "belum ada rencana" empty state, not an error. `plan_json.status` stays
+`DRAFT pending human approval` by design: approval is the row existing, never that string.
 
 <p align="center">
   <img src="docs/screenshots/04-patient-plan.webp" width="300" alt="Approved plan">
@@ -58,13 +58,14 @@ rendered as returned, not reworded.
 <p align="center"><img src="docs/screenshots/11-nurse-intake-factors.webp" width="300" alt="Risk factors"></p>
 
 **Draft** (`POST /api/v1/plans/draft`) requires an explicit follow-up date and hotline; F3 refuses
-to invent either. The result is labelled as a draft with its honest status.
+to invent either. The result is labelled as a draft with the server's status.
 
 <p align="center"><img src="docs/screenshots/14-nurse-draft-result.webp" width="300" alt="Draft plan"></p>
 
 **Approval desk** starts an F4 background job (`POST /api/v1/reviews`), consumes the SSE feed, and
 renders the human gate with all four decisions. On resume it reopens the stream, so the terminal
-output appears without a manual refresh. Timeout and stream failures show an honest fallback path.
+output appears without a manual refresh. Timeout and stream failures show a retry path, not a
+fabricated result.
 
 <p align="center">
   <img src="docs/screenshots/18-approval-gate.webp" width="260" alt="Gate">
@@ -122,7 +123,7 @@ The live system overrides `FRONTEND-CONTRACT.md` where they differ. The client i
 - **F4 start** takes the **complete F3 output JSON string** as `draft`; sending only `plan_text`
   fails the flow guard.
 - **F4 resume to `SynCare-be` is flat**: `{request_id, action_id, actor, reviewer_note}`. The
-  backend nests the decision for Langflow. `request_id` is always sent — omitting it returns `200`
+  backend nests the decision for Langflow. `request_id` is always sent. Omitting it returns `200`
   while leaving the job suspended.
 - `GET /api/v1/plans/:patientId` returns `{patientId, plans: [...]}`; the client takes the first
   filtered row. `404` is an empty state.
@@ -140,11 +141,11 @@ approved plan appears in the approval desk's live result but not in **Patients &
 answers can exist for a patient whose plan row is absent (and vice versa). This is a backend
 runtime configuration issue, not client logic. Align `SYNCARE_REVIEW_DB` (backend) with the
 `db_path` used by the F4/F5 flow nodes, then restart both services. The client continues to show
-each endpoint's honest response in the meantime.
+each endpoint's response unchanged in the meantime.
 
 ## Tests
 
-`flutter analyze` is clean and `flutter test` passes 128 tests. Coverage includes:
+`flutter analyze` is clean and `flutter test` passes 132 tests. Coverage includes:
 
 - Dio bearer header, `401` / `503` mapping, F2's JSON-string body, the flat resume payload, and the
   filtered `plans/:id` wrapper;

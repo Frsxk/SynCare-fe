@@ -178,6 +178,36 @@ void main() {
       );
     });
 
+    test('getPlan unwraps the live filtered list shape', () async {
+      final harness = _Harness();
+      harness.adapter.onGet(
+        '/api/v1/plans/demo-1',
+        (server) => server.reply(200, <String, dynamic>{
+          'patientId': 'demo-1',
+          'plans': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'patientId': 'demo-1',
+              'plan_json': jsonEncode(<String, dynamic>{
+                'patient_id': 'demo-1',
+                'plan_text': 'Rencana uji.',
+                'tier': 'HIGH',
+                'care_intensity': <String>['Check-in harian.'],
+                'status': 'DRAFT pending human approval',
+              }),
+              'approved_at': '2026-10-09T16:49:13.798724+00:00',
+              'reviewer_note': 'Disetujui.',
+            },
+          ],
+        }),
+      );
+
+      final record = await harness.client.getPlan('demo-1');
+      expect(record.patientId, 'demo-1');
+      expect(record.plan.planText, 'Rencana uji.');
+      expect(record.plan.tier, 'HIGH');
+      expect(record.approvedAt.toUtc().year, 2026);
+    });
+
     test('404 on getPlan becomes NotFoundException', () async {
       final harness = _Harness();
       harness.adapter.onGet(

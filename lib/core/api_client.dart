@@ -213,9 +213,20 @@ class ApiClient implements SyncareApi {
       final response = await _dio.get<Object?>(
         '/api/v1/plans/${Uri.encodeComponent(patientId)}',
       );
-      return ApprovedPlanRecord.fromJson(
-        _requireMap(_decodeData(response.data)),
-      );
+      final data = _requireMap(_decodeData(response.data));
+      // Live shape: {"patientId": "...", "plans": [{...}]} — a filtered list,
+      // not a single record (verified 2026-10-23).
+      final plans = data['plans'];
+      if (plans is List) {
+        if (plans.isEmpty) {
+          throw const NotFoundException();
+        }
+        return ApprovedPlanRecord.fromJson(_requireMap(plans.first));
+      }
+      if (plans is Map) {
+        return ApprovedPlanRecord.fromJson(_requireMap(plans));
+      }
+      return ApprovedPlanRecord.fromJson(data);
     });
   }
 

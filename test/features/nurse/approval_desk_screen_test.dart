@@ -391,6 +391,59 @@ void main() {
     await disposeScreen(tester, controller);
   });
 
+  testWidgets('resume reopens the stream and delivers the terminal output', (
+    tester,
+  ) async {
+    final FakeSyncareApi api = startApi();
+    api.onResumeReview =
+        ({
+          required String jobId,
+          required String requestId,
+          required String actionId,
+          required String actor,
+          String reviewerNote = '',
+        }) async {};
+    final StreamController<SseEvent> controller =
+        StreamController<SseEvent>.broadcast();
+    int subscriptions = 0;
+    final FakeReviewEventSource events = FakeReviewEventSource(
+      onEvents: (_) {
+        subscriptions += 1;
+        return controller.stream;
+      },
+    );
+
+    await tester.pumpWidget(screen(api, draft: _draft, events: events));
+    await tapStart(tester);
+    expect(subscriptions, 1);
+    await emitGate(tester, controller);
+
+    final Finder approve = find.text('Setujui');
+    await tester.ensureVisible(approve);
+    await tester.pump();
+    await tester.tap(approve);
+    await tester.pump();
+    await tester.pump();
+
+    // Langflow ends the old stream at the gate; the desk must resubscribe.
+    expect(subscriptions, 2);
+
+    await emit(tester, controller, 'output', <String, dynamic>{
+      'content': jsonEncode(<String, dynamic>{
+        'action': 'approve',
+        'confirmation': 'Rencana disetujui dan tersimpan.',
+        'patient_id': 'demo-1',
+        'approved_at': '2026-10-23T10:00:00Z',
+        'reviewer_note': '',
+      }),
+    });
+
+    expect(find.text('Persetujuan selesai'), findsOneWidget);
+    expect(find.text('Rencana disetujui dan tersimpan.'), findsOneWidget);
+
+    await disposeScreen(tester, controller);
+  });
+
   testWidgets('timeout shows the fallback escape hatch and resumes with it', (
     tester,
   ) async {

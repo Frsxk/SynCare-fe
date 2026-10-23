@@ -383,6 +383,11 @@ class _NurseApprovalDeskScreenState
         _phase = _DeskPhase.waiting;
       });
       _ensureTicker();
+      // Langflow closes the event stream when the job pauses at the gate.
+      // Reopen it after resume so the terminal output is delivered without a
+      // manual refresh; the replay includes the old gate, which is ignored
+      // because `_decided` is now true.
+      _subscribe(jobId);
     } catch (error) {
       if (!mounted) {
         return;

@@ -12,6 +12,7 @@ import '../../core/sse.dart';
 import '../../models/health.dart';
 import '../../models/plan_draft.dart';
 import '../../models/review_job.dart';
+import '../../widgets/content_width.dart';
 import '../../widgets/disclaimer_banner.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
@@ -77,10 +78,6 @@ class _NurseApprovalDeskScreenState
     final String value = _reviewerController.text.trim();
     return value.isEmpty ? AppConfig.defaultReviewer : value;
   }
-
-  // ---------------------------------------------------------------------------
-  // Review lifecycle
-  // ---------------------------------------------------------------------------
 
   Future<void> _startReview() async {
     final PlanDraft? draft = ref.read(draftResultProvider);
@@ -383,10 +380,8 @@ class _NurseApprovalDeskScreenState
         _phase = _DeskPhase.waiting;
       });
       _ensureTicker();
-      // Langflow closes the event stream when the job pauses at the gate.
-      // Reopen it after resume so the terminal output is delivered without a
-      // manual refresh; the replay includes the old gate, which is ignored
-      // because `_decided` is now true.
+      // Langflow ends the stream at the gate; reconnect after resume for the output.
+      // The replayed gate is ignored because `_decided` is true.
       _subscribe(jobId);
     } catch (error) {
       if (!mounted) {
@@ -506,10 +501,6 @@ class _NurseApprovalDeskScreenState
         '${rest.toString().padLeft(2, '0')}';
   }
 
-  // ---------------------------------------------------------------------------
-  // Build
-  // ---------------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     final PlanDraft? draft = ref.watch(draftResultProvider);
@@ -518,14 +509,16 @@ class _NurseApprovalDeskScreenState
     return Scaffold(
       appBar: AppBar(title: const Text('Meja Persetujuan')),
       body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: DisclaimerBanner(),
-            ),
-            Expanded(child: _buildBody(draft, patientId)),
-          ],
+        child: ContentWidth(
+          child: Column(
+            children: <Widget>[
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: DisclaimerBanner(),
+              ),
+              Expanded(child: _buildBody(draft, patientId)),
+            ],
+          ),
         ),
       ),
     );

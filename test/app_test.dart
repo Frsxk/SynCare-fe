@@ -91,7 +91,7 @@ void main() {
     expect(find.text('Saya Pasien'), findsOneWidget);
     expect(find.text('Saya Perawat'), findsOneWidget);
     expect(find.byType(DisclaimerBanner), findsOneWidget);
-    expect(find.text('Demo sintetis — bukan nasihat medis'), findsOneWidget);
+    expect(find.text('Demo sintetis, bukan nasihat medis'), findsOneWidget);
   });
 
   testWidgets(

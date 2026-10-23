@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Material 3 theme and shared palette for SynCare.
-///
 /// Risk colours deliberately use dark foregrounds on light tinted surfaces
 /// (>= 7:1 contrast) instead of saturated pastels, so the tier text stays
 /// readable for low-vision users in bright clinical environments.
 class AppTheme {
   const AppTheme._();
 
-  /// Seed for the light colour scheme.
   static const Color seedColor = Color(0xFF006B5F);
 
   // Risk tier surfaces and their readable foregrounds.

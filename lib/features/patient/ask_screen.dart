@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../models/ask_answer.dart';
+import '../../widgets/content_width.dart';
 import '../../widgets/disclaimer_banner.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
@@ -48,6 +49,7 @@ class _PatientAskScreenState extends ConsumerState<PatientAskScreen> {
     }
 
     final String patientId = ref.read(patientIdProvider);
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _submitting = true;
       _error = null;
@@ -99,25 +101,27 @@ class _PatientAskScreenState extends ConsumerState<PatientAskScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Tanya Rencana')),
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: DisclaimerBanner(),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-              child: Text(
-                'ID pasien: $patientId',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+        child: ContentWidth(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: DisclaimerBanner(),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: Text(
+                  'ID pasien: $patientId',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-            ),
-            Expanded(child: _buildAnswerArea()),
-            _buildComposer(),
-          ],
+              Expanded(child: _buildAnswerArea()),
+              _buildComposer(),
+            ],
+          ),
         ),
       ),
     );
@@ -125,7 +129,26 @@ class _PatientAskScreenState extends ConsumerState<PatientAskScreen> {
 
   Widget _buildAnswerArea() {
     if (_submitting) {
-      return const Center(child: CircularProgressIndicator());
+      final ThemeData theme = Theme.of(context);
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Mencari jawaban…',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     final Object? error = _error;

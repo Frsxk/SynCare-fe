@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Centered placeholder for screens with no data yet.
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,

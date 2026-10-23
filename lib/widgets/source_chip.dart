@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Small provenance chip: `Sumber: <source>`.
-///
 /// Long provenance strings stay on one line and truncate with an ellipsis;
 /// the full value remains available through a tooltip.
 class SourceChip extends StatelessWidget {

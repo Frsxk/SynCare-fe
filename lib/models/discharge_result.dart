@@ -47,7 +47,6 @@ class Episode {
   }
 }
 
-/// One scored risk factor from F1.
 class RiskFactor {
   const RiskFactor({
     required this.name,
@@ -83,7 +82,6 @@ class RiskFactor {
   }
 }
 
-/// Parsed F1 output.
 class DischargeResult {
   const DischargeResult({
     this.episode = const Episode(),

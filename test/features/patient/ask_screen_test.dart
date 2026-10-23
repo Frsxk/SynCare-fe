@@ -112,6 +112,7 @@ void main() {
     await submitQuestion(tester, 'bolehkah saya berolahraga?');
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('Mencari jawaban…'), findsOneWidget);
     expect(find.byType(EmptyState), findsNothing);
     expect(sentPatientId, AppConfig.defaultPatientId);
     expect(sentQuery, 'bolehkah saya berolahraga?');

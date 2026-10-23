@@ -190,7 +190,7 @@ class _DemoSettingsCard extends StatelessWidget {
   }
 }
 
-class _RoleCard extends StatelessWidget {
+class _RoleCard extends StatefulWidget {
   const _RoleCard({
     required this.icon,
     required this.title,
@@ -204,6 +204,34 @@ class _RoleCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_RoleCard> createState() => _RoleCardState();
+}
+
+class _RoleCardState extends State<_RoleCard> {
+  final FocusNode _focusNode = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_onFocusChanged);
+  }
+
+  void _onFocusChanged() {
+    if (!mounted) {
+      return;
+    }
+    setState(() => _focused = _focusNode.hasFocus);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChanged);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -215,10 +243,14 @@ class _RoleCard extends StatelessWidget {
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: colorScheme.outlineVariant),
+        side: BorderSide(
+          color: _focused ? colorScheme.primary : colorScheme.outlineVariant,
+          width: _focused ? 2 : 1,
+        ),
       ),
       child: InkWell(
-        onTap: onTap,
+        focusNode: _focusNode,
+        onTap: widget.onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
           child: Row(
@@ -231,7 +263,7 @@ class _RoleCard extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  icon,
+                  widget.icon,
                   size: 30,
                   color: colorScheme.onPrimaryContainer,
                 ),
@@ -242,14 +274,14 @@ class _RoleCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      widget.title,
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      description,
+                      widget.description,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),

@@ -7,6 +7,7 @@ import '../../core/api_exception.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../models/checkin_result.dart';
+import '../../widgets/content_width.dart';
 import '../../widgets/disclaimer_banner.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
@@ -89,22 +90,24 @@ class _PatientCheckinScreenState extends ConsumerState<PatientCheckinScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              const DisclaimerBanner(),
-              const SizedBox(height: 20),
-              Text(
-                'ID pasien: $patientId',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+          child: ContentWidth(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const DisclaimerBanner(),
+                const SizedBox(height: 20),
+                Text(
+                  'ID pasien: $patientId',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildOutcome(theme),
-              const SizedBox(height: 20),
-              _buildForm(theme),
-            ],
+                const SizedBox(height: 16),
+                _buildOutcome(theme),
+                const SizedBox(height: 20),
+                _buildForm(theme),
+              ],
+            ),
           ),
         ),
       ),

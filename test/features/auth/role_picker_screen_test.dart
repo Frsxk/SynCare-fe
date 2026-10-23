@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -77,6 +78,29 @@ void main() {
     expect(selected, AppRole.patient);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('role'), 'patient');
+  });
+
+  testWidgets('selects the patient role with Tab and Enter', (tester) async {
+    AppRole? selected;
+    await pumpScreen(tester, onSelected: (role) => selected = role);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    final ThemeData theme = Theme.of(tester.element(find.text('Saya Pasien')));
+    final Card card = tester.widget<Card>(
+      find
+          .ancestor(of: find.text('Saya Pasien'), matching: find.byType(Card))
+          .first,
+    );
+    final RoundedRectangleBorder shape = card.shape! as RoundedRectangleBorder;
+    expect(shape.side.color, theme.colorScheme.primary);
+    expect(shape.side.width, 2);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+
+    expect(selected, AppRole.patient);
   });
 
   testWidgets('edited patient ID is persisted and reaches the provider', (

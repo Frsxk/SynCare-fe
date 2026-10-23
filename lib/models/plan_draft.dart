@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-/// Parsed F3 plan draft.
 class PlanDraft {
   const PlanDraft({
     this.planText = '',

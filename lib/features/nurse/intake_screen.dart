@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../models/discharge_result.dart';
+import '../../widgets/content_width.dart';
 import '../../widgets/disclaimer_banner.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
@@ -75,44 +76,41 @@ class _NurseIntakeScreenState extends ConsumerState<NurseIntakeScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  const DisclaimerBanner(),
-                  const SizedBox(height: 16),
-                  _buildForm(context),
-                  const SizedBox(height: 24),
-                  if (_submitting)
-                    const _LoadingPanel()
-                  else if (_error != null)
-                    SizedBox(
-                      height: 360,
-                      child: ErrorState(
-                        error: _error!,
-                        onRetry: _submit,
-                        onReauth: () => showTokenDialog(context, ref),
-                      ),
-                    )
-                  else if (result == null)
-                    const SizedBox(
-                      height: 340,
-                      child: EmptyState(
-                        icon: Icons.fact_check_outlined,
-                        title: 'Belum ada penilaian',
-                        message:
-                            'F1 mengekstrak episode rawat inap dari ringkasan '
-                            'pulang, lalu memberi skor faktor risiko untuk '
-                            'membantu penilaian awal. Tempel ringkasan di atas, '
-                            'lalu tekan "Nilai ringkasan pulang".',
-                      ),
-                    )
-                  else
-                    _ResultView(result: result),
-                ],
-              ),
+          child: ContentWidth(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const DisclaimerBanner(),
+                const SizedBox(height: 16),
+                _buildForm(context),
+                const SizedBox(height: 24),
+                if (_submitting)
+                  const _LoadingPanel()
+                else if (_error != null)
+                  SizedBox(
+                    height: 360,
+                    child: ErrorState(
+                      error: _error!,
+                      onRetry: _submit,
+                      onReauth: () => showTokenDialog(context, ref),
+                    ),
+                  )
+                else if (result == null)
+                  const SizedBox(
+                    height: 340,
+                    child: EmptyState(
+                      icon: Icons.fact_check_outlined,
+                      title: 'Belum ada penilaian',
+                      message:
+                          'F1 mengekstrak episode rawat inap dari ringkasan '
+                          'pulang, lalu memberi skor faktor risiko untuk '
+                          'membantu penilaian awal. Tempel ringkasan di atas, '
+                          'lalu tekan "Nilai ringkasan pulang".',
+                    ),
+                  )
+                else
+                  _ResultView(result: result),
+              ],
             ),
           ),
         ),
@@ -512,15 +510,15 @@ String _humanizeFactorName(String name) {
 }
 
 /// Renders a JSON scalar exactly as the server sent it; missing values get an
-/// explicit dash instead of invented content.
+/// explicit label instead of invented content.
 String _displayValue(Object? value) {
   if (value == null) {
-    return '—';
+    return 'Tidak tersedia';
   }
   final String text = value.toString();
-  return text.isEmpty ? '—' : text;
+  return text.isEmpty ? 'Tidak tersedia' : text;
 }
 
 String _verbatim(String value) {
-  return value.isEmpty ? '—' : value;
+  return value.isEmpty ? 'Tidak tersedia' : value;
 }

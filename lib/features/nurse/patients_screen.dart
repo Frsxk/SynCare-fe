@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/providers.dart';
 import '../../models/approved_plan.dart';
+import '../../widgets/content_width.dart';
 import '../../widgets/disclaimer_banner.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
@@ -33,39 +34,41 @@ class NursePatientsScreen extends ConsumerWidget {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: DisclaimerBanner(),
-            ),
-            Expanded(
-              child: asyncPlans.when(
-                loading: () => const _LoadingView(),
-                error: (Object error, StackTrace stackTrace) => ErrorState(
-                  error: error,
-                  onRetry: () => ref.invalidate(plansProvider),
-                  onReauth: () => showTokenDialog(context, ref),
-                ),
-                data: (PlansResponse response) {
-                  final List<ApprovedPlanRecord> plans = response.plans;
-                  final List<AuditEntry> audit = response.audit;
-
-                  if (plans.isEmpty && audit.isEmpty) {
-                    return const EmptyState(
-                      title: 'Belum ada rencana disetujui',
-                      message:
-                          'Rencana yang disetujui perawat akan muncul di sini '
-                          'beserta jejak auditnya.',
-                      icon: Icons.folder_open_outlined,
-                    );
-                  }
-
-                  return _PlansAndAuditView(plans: plans, audit: audit);
-                },
+        child: ContentWidth(
+          child: Column(
+            children: <Widget>[
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: DisclaimerBanner(),
               ),
-            ),
-          ],
+              Expanded(
+                child: asyncPlans.when(
+                  loading: () => const _LoadingView(),
+                  error: (Object error, StackTrace stackTrace) => ErrorState(
+                    error: error,
+                    onRetry: () => ref.invalidate(plansProvider),
+                    onReauth: () => showTokenDialog(context, ref),
+                  ),
+                  data: (PlansResponse response) {
+                    final List<ApprovedPlanRecord> plans = response.plans;
+                    final List<AuditEntry> audit = response.audit;
+
+                    if (plans.isEmpty && audit.isEmpty) {
+                      return const EmptyState(
+                        title: 'Belum ada rencana disetujui',
+                        message:
+                            'Rencana yang disetujui perawat akan muncul di sini '
+                            'beserta jejak auditnya.',
+                        icon: Icons.folder_open_outlined,
+                      );
+                    }
+
+                    return _PlansAndAuditView(plans: plans, audit: audit);
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -173,7 +176,7 @@ class _PlanCard extends StatelessWidget {
       'dd/MM/yyyy HH:mm',
     ).format(record.approvedAt.toLocal());
     final String note = record.reviewerNote.trim().isEmpty
-        ? '—'
+        ? 'Tidak tersedia'
         : record.reviewerNote;
 
     return Card(

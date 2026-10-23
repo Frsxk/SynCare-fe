@@ -100,7 +100,7 @@ void main() {
     expect(bannerTop, lessThan(planTop));
 
     expect(
-      find.text('FHIR-shaped output — bukan submission SATUSEHAT.'),
+      find.text('FHIR-shaped output, bukan submission SATUSEHAT.'),
       findsOneWidget,
     );
 
@@ -132,7 +132,7 @@ void main() {
     expect(find.text('1500-HOME'), findsOneWidget);
   });
 
-  testWidgets('renders an honest empty state for a 404', (tester) async {
+  testWidgets('renders an empty state for a 404', (tester) async {
     await pumpScreen(
       tester,
       onGetPlan: (_) async => throw const NotFoundException(),

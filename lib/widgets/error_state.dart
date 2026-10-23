@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../core/api_exception.dart';
 
-/// Full-screen error state that maps typed API failures to honest Indonesian
-/// copy. Raw exception text (and stack traces) are never rendered.
+/// Full-screen error state that maps typed API failures to Indonesian copy.
+/// Raw exception text (and stack traces) are never rendered.
 class ErrorState extends StatelessWidget {
   const ErrorState({
     super.key,

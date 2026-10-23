@@ -6,6 +6,7 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../models/discharge_result.dart';
 import '../../models/plan_draft.dart';
+import '../../widgets/content_width.dart';
 import '../../widgets/disclaimer_banner.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
@@ -144,22 +145,24 @@ class _NurseDraftScreenState extends ConsumerState<NurseDraftScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Draf Tindak Lanjut')),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: DisclaimerBanner(),
-          ),
-          Expanded(
-            child: _buildContent(
-              context,
-              f1: f1,
-              draft: draft,
-              patientId: patientId,
+      body: ContentWidth(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: DisclaimerBanner(),
             ),
-          ),
-        ],
+            Expanded(
+              child: _buildContent(
+                context,
+                f1: f1,
+                draft: draft,
+                patientId: patientId,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -376,7 +379,7 @@ class _DraftResultCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Belum disetujui — wajib ditinjau tenaga kesehatan.',
+              'Belum disetujui, wajib ditinjau tenaga kesehatan.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),

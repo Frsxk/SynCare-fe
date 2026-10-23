@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config.dart';
 import '../core/providers.dart';
 
-/// Opens the bearer-token dialog.
-///
 /// The field starts empty, the entered value is obscured by default, and the
 /// token is only written through [TokenSource.write]. Nothing is logged and
 /// the current token is never read back into the field.
@@ -14,8 +13,16 @@ Future<void> showTokenDialog(BuildContext context, WidgetRef ref) {
   return showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (BuildContext dialogContext) =>
-        _TokenDialog(tokenSource: tokenSource),
+    builder: (BuildContext dialogContext) => CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.escape): () =>
+            Navigator.of(dialogContext).pop(),
+      },
+      child: Focus(
+        autofocus: true,
+        child: _TokenDialog(tokenSource: tokenSource),
+      ),
+    ),
   );
 }
 

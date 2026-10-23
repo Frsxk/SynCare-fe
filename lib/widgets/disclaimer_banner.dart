@@ -36,7 +36,7 @@ class DisclaimerBanner extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    'Demo sintetis — bukan nasihat medis',
+                    'Demo sintetis, bukan nasihat medis',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: AppTheme.onWarningContainer,
                       fontWeight: FontWeight.w700,

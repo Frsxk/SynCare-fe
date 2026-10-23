@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../core/api_exception.dart';
 import '../../core/providers.dart';
 import '../../models/approved_plan.dart';
+import '../../widgets/content_width.dart';
 import '../../widgets/disclaimer_banner.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
@@ -17,7 +18,7 @@ import '../../widgets/token_dialog.dart';
 ///
 /// The server row is rendered verbatim: the tier, plan text, cadence, approval
 /// metadata, and SATUSEHAT artifacts all come from `GET /plans/:patientId`.
-/// A `404` is an honest "no approved plan yet" state, never an error.
+/// A `404` renders the empty state, not an error.
 class PatientPlanScreen extends ConsumerWidget {
   const PatientPlanScreen({super.key});
 
@@ -32,49 +33,51 @@ class PatientPlanScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Rencana Saya')),
       body: SafeArea(
         top: false,
-        child: Column(
-          children: <Widget>[
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: DisclaimerBanner(),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'ID Pasien: $patientId',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+        child: ContentWidth(
+          child: Column(
+            children: <Widget>[
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: DisclaimerBanner(),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'ID Pasien: $patientId',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
-            ),
-            Expanded(
-              child: asyncPlan.when(
-                loading: () => const _PlanLoading(),
-                error: (Object error, StackTrace stackTrace) {
-                  if (error is NotFoundException) {
-                    return const EmptyState(
-                      title: 'Belum ada rencana yang disetujui',
-                      message:
-                          'Rencana akan muncul di sini setelah perawat '
-                          'menyetujui draf tindak lanjut.',
-                      icon: Icons.description_outlined,
+              Expanded(
+                child: asyncPlan.when(
+                  loading: () => const _PlanLoading(),
+                  error: (Object error, StackTrace stackTrace) {
+                    if (error is NotFoundException) {
+                      return const EmptyState(
+                        title: 'Belum ada rencana yang disetujui',
+                        message:
+                            'Rencana akan muncul di sini setelah perawat '
+                            'menyetujui draf tindak lanjut.',
+                        icon: Icons.description_outlined,
+                      );
+                    }
+                    return ErrorState(
+                      error: error,
+                      onRetry: () =>
+                          ref.invalidate(approvedPlanProvider(patientId)),
+                      onReauth: () => showTokenDialog(context, ref),
                     );
-                  }
-                  return ErrorState(
-                    error: error,
-                    onRetry: () =>
-                        ref.invalidate(approvedPlanProvider(patientId)),
-                    onReauth: () => showTokenDialog(context, ref),
-                  );
-                },
-                data: (ApprovedPlanRecord record) =>
-                    _PlanDetails(record: record),
+                  },
+                  data: (ApprovedPlanRecord record) =>
+                      _PlanDetails(record: record),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -139,7 +142,7 @@ class _PlanDetails extends StatelessWidget {
           _SectionCard(
             title: 'Rencana tindak lanjut',
             child: Text(
-              plan.planText.trim().isEmpty ? '—' : plan.planText,
+              plan.planText.trim().isEmpty ? 'Tidak tersedia' : plan.planText,
               style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
             ),
           ),
@@ -165,13 +168,16 @@ class _PlanDetails extends StatelessWidget {
               children: <Widget>[
                 _LabeledRow(
                   label: 'Instruksi pasien',
-                  value: instruction ?? '—',
+                  value: instruction ?? 'Tidak tersedia',
                 ),
                 _LabeledRow(
                   label: 'Tanggal tindak lanjut',
-                  value: followupDate ?? '—',
+                  value: followupDate ?? 'Tidak tersedia',
                 ),
-                _LabeledRow(label: 'Hotline', value: hotline ?? '—'),
+                _LabeledRow(
+                  label: 'Hotline',
+                  value: hotline ?? 'Tidak tersedia',
+                ),
               ],
             ),
           ),
@@ -188,11 +194,11 @@ class _PlanDetails extends StatelessWidget {
                 _LabeledRow(
                   label: 'Catatan peninjau',
                   value: record.reviewerNote.trim().isEmpty
-                      ? '—'
+                      ? 'Tidak tersedia'
                       : record.reviewerNote,
                 ),
                 Text(
-                  'Status: ${status.isEmpty ? '—' : status}',
+                  'Status: ${status.isEmpty ? 'Tidak tersedia' : status}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                     height: 1.4,
@@ -287,7 +293,7 @@ class _MissingValue extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
 
     return Text(
-      '—',
+      'Tidak tersedia',
       style: theme.textTheme.bodyMedium?.copyWith(
         color: theme.colorScheme.onSurfaceVariant,
       ),
@@ -310,7 +316,7 @@ class _SatuseshatExpansion extends StatelessWidget {
         leading: const Icon(Icons.data_object_outlined),
         title: const Text('Detail SATUSEHAT'),
         subtitle: Text(
-          'FHIR-shaped output — bukan submission SATUSEHAT.',
+          'FHIR-shaped output, bukan submission SATUSEHAT.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
             height: 1.4,
@@ -411,7 +417,7 @@ String? _hotline(String? instruction) {
 
 String _prettyJson(Object? value) {
   if (value == null) {
-    return '—';
+    return 'Tidak tersedia';
   }
   return const JsonEncoder.withIndent('  ').convert(value);
 }

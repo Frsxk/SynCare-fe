@@ -104,9 +104,7 @@ void main() {
     await tester.tap(button);
   }
 
-  testWidgets('honestly asks for an intake result when F1 is missing', (
-    tester,
-  ) async {
+  testWidgets('asks for an intake result when F1 is missing', (tester) async {
     final FakeSyncareApi api = FakeSyncareApi();
     await pumpScreen(tester, api: api, f1: null);
 
@@ -289,7 +287,7 @@ void main() {
     expect(containerOf(tester).read(draftResultProvider), same(_draft));
   });
 
-  testWidgets('shows missing facts from the server as an honest warning', (
+  testWidgets('shows missing facts from the server as a warning', (
     tester,
   ) async {
     final FakeSyncareApi api = FakeSyncareApi();

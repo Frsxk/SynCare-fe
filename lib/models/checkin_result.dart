@@ -1,4 +1,3 @@
-/// One scoring adjustment applied by F2.
 class CheckinAdjustment {
   const CheckinAdjustment({
     this.condition = '',

@@ -111,7 +111,6 @@ ApprovedPlan _parsePlanJson(String value) {
   return ApprovedPlan.fromJson(map);
 }
 
-/// One entry of the audit trail.
 class AuditEntry {
   const AuditEntry({
     this.action = '',

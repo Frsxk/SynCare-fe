@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/theme.dart';
 
-/// Renders the server-provided risk tier verbatim as a readable chip.
-///
 /// Only the three tiers the server actually emits are recognised; anything
 /// else (including `null`) becomes a neutral "TIDAK DIKETAHUI" chip.
 class RiskBadge extends StatelessWidget {

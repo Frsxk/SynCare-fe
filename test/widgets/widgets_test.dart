@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:syncare_flutter/core/api_exception.dart';
 import 'package:syncare_flutter/core/config.dart';
 import 'package:syncare_flutter/core/providers.dart';
 import 'package:syncare_flutter/core/theme.dart';
+import 'package:syncare_flutter/widgets/content_width.dart';
 import 'package:syncare_flutter/widgets/disclaimer_banner.dart';
 import 'package:syncare_flutter/widgets/empty_state.dart';
 import 'package:syncare_flutter/widgets/error_state.dart';
@@ -38,6 +40,44 @@ void main() {
           ?.resolve(const <WidgetState>{});
       expect(buttonSize, isNotNull);
       expect(buttonSize!.height, greaterThanOrEqualTo(48));
+    });
+  });
+
+  group('ContentWidth', () {
+    const Key childKey = Key('content-width-child');
+
+    testWidgets('caps content at 720 on a wide surface', (
+      WidgetTester tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _pump(
+        tester,
+        const ContentWidth(
+          child: SizedBox(key: childKey, width: double.infinity, height: 10),
+        ),
+      );
+
+      expect(tester.getSize(find.byKey(childKey)).width, 720);
+    });
+
+    testWidgets('fills a narrow surface', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _pump(
+        tester,
+        const ContentWidth(
+          child: SizedBox(key: childKey, width: double.infinity, height: 10),
+        ),
+      );
+
+      expect(tester.getSize(find.byKey(childKey)).width, 400);
     });
   });
 
@@ -420,6 +460,26 @@ void main() {
 
       await tester.enterText(find.byType(TextField), 'tidak-jadi-disimpan');
       await tester.tap(find.text('Batal'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(source.writes, isEmpty);
+    });
+
+    testWidgets('Escape closes without writing', (WidgetTester tester) async {
+      final _RecordingTokenSource source = _RecordingTokenSource();
+
+      await tester.pumpWidget(
+        wrapScreen(
+          const _TokenDialogHost(),
+          overrides: <Override>[tokenSourceProvider.overrideWithValue(source)],
+        ),
+      );
+
+      await tester.tap(find.text('Buka token'));
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsNothing);

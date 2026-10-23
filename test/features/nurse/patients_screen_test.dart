@@ -143,32 +143,31 @@ void main() {
     },
   );
 
-  testWidgets(
-    'renders honest empty state when both plans and audit are empty',
-    (tester) async {
-      await pumpScreen(
-        tester,
-        onListPlans: () async => const PlansResponse(
-          plans: <ApprovedPlanRecord>[],
-          audit: <AuditEntry>[],
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('renders an empty state when both plans and audit are empty', (
+    tester,
+  ) async {
+    await pumpScreen(
+      tester,
+      onListPlans: () async => const PlansResponse(
+        plans: <ApprovedPlanRecord>[],
+        audit: <AuditEntry>[],
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.byType(EmptyState), findsOneWidget);
-      expect(find.byType(ErrorState), findsNothing);
-      expect(find.text('Belum ada rencana disetujui'), findsOneWidget);
-      expect(
-        find.text(
-          'Rencana yang disetujui perawat akan muncul di sini '
-          'beserta jejak auditnya.',
-        ),
-        findsOneWidget,
-      );
-      expect(find.byIcon(Icons.folder_open_outlined), findsOneWidget);
-      expect(find.byType(DisclaimerBanner), findsOneWidget);
-    },
-  );
+    expect(find.byType(EmptyState), findsOneWidget);
+    expect(find.byType(ErrorState), findsNothing);
+    expect(find.text('Belum ada rencana disetujui'), findsOneWidget);
+    expect(
+      find.text(
+        'Rencana yang disetujui perawat akan muncul di sini '
+        'beserta jejak auditnya.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.folder_open_outlined), findsOneWidget);
+    expect(find.byType(DisclaimerBanner), findsOneWidget);
+  });
 
   testWidgets(
     'shows warming retry copy for EngineWarmingException and retries',
@@ -236,7 +235,7 @@ void main() {
     expect(find.text('patient-2'), findsOneWidget);
   });
 
-  testWidgets('renders em-dash when reviewer note is empty or whitespace', (
+  testWidgets('renders a missing-note label when the reviewer note is empty', (
     tester,
   ) async {
     await pumpScreen(
@@ -248,7 +247,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('—'), findsOneWidget);
+    expect(find.text('Tidak tersedia'), findsOneWidget);
   });
 
   testWidgets('is read-only with no edit or delete controls', (tester) async {

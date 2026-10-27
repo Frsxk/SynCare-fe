@@ -286,9 +286,6 @@ void main() {
           .read(sessionControllerProvider.notifier)
           .login('a', 'synthetic-component-password');
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Ringkasan perawatan saya'));
-      await tester.tap(find.text('Ringkasan perawatan saya'));
-      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Tulis check-in'));
       await tester.tap(find.text('Tulis check-in'));
       await tester.pumpAndSettle();
@@ -357,6 +354,10 @@ void main() {
         overrides: [
           sessionApiProvider.overrideWithValue(api),
           tokenSourceProvider.overrideWithValue(storage),
+          apiProvider.overrideWithValue(
+            FakeSyncareApi()
+              ..onGetPatientOverview = (id) async => overviewFixture(id: id),
+          ),
         ],
       );
       addTearDown(scope.dispose);
@@ -375,7 +376,7 @@ void main() {
       await tester.ensureVisible(find.widgetWithText(FilledButton, 'Masuk'));
       await tester.tap(find.widgetWithText(FilledButton, 'Masuk'));
       await tester.pumpAndSettle();
-      expect(find.text('Akun saya'), findsOneWidget);
+      expect(find.text('Ringkasan saya'), findsOneWidget);
       expect(
         (scope.read(sessionControllerProvider) as SessionAuthenticated)
             .session
@@ -408,6 +409,10 @@ void main() {
         overrides: [
           sessionApiProvider.overrideWithValue(api),
           tokenSourceProvider.overrideWithValue(FakeTokenSource('saved-token')),
+          apiProvider.overrideWithValue(
+            FakeSyncareApi()
+              ..onGetPatientOverview = (id) async => overviewFixture(id: id),
+          ),
         ],
       );
       addTearDown(scope.dispose);
@@ -420,7 +425,7 @@ void main() {
       api.onRestore = (_) async => grant('b').session;
       await tester.tap(find.text('Periksa sesi lagi'));
       await tester.pumpAndSettle();
-      expect(find.text('Akun saya'), findsOneWidget);
+      expect(find.text('Ringkasan saya'), findsOneWidget);
       expect(
         (scope.read(sessionControllerProvider) as SessionAuthenticated)
             .session
@@ -464,6 +469,8 @@ void main() {
       await scope
           .read(sessionControllerProvider.notifier)
           .login('a', 'synthetic-component-password');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Akun'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Ringkasan perawatan saya'));
       await tester.tap(find.text('Ringkasan perawatan saya'));

@@ -39,7 +39,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         return path == '/' ? null : '/';
       }
       if (path == '/') {
-        return '/account';
+        return session.session.principal.role == 'patient'
+            ? '/patient/home'
+            : '/account';
       }
       if (path.startsWith('/nurse/') &&
               session.session.principal.role != 'nurse' ||

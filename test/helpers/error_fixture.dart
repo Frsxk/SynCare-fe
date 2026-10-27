@@ -17,6 +17,5 @@ String nestedErrorBody(
 });
 
 /// Deliberate legacy flat envelope still served by older routes.
-String legacyErrorBody(String code, {String? message}) => jsonEncode(
-  <String, Object?>{'error': code, if (message != null) 'message': message},
-);
+String legacyErrorBody(String code, {String? message}) =>
+    jsonEncode(<String, Object?>{'error': code, 'message': ?message});

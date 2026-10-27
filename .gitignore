@@ -50,6 +50,7 @@ FRONTEND-CONTRACT.md
 syncare-mvp-proposal-flutter.md
 
 # Local secrets / runtime config
+/secrets/
 .env
 env.json
 *.keystore

@@ -73,7 +73,7 @@ class OverviewContent extends StatelessWidget {
       )) ...[
         const SizedBox(height: 16),
         Text(
-          'Waktu laporan mendesak terakhir: ${overview.latestReport!.createdAt}',
+          'Waktu laporan mendesak terakhir: ${overview.latestReport!.createdLabel}',
         ),
         EmergencyNotice(
           reason: reason,
@@ -129,7 +129,7 @@ class OverviewContent extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             if (overview.latestReport case final CheckinRecord report) ...[
-              Text('Laporan terakhir: ${report.createdAt}'),
+              Text('Laporan terakhir: ${report.createdLabel}'),
               Text(report.processing.label),
             ] else
               const Text('Belum ada laporan tersimpan.'),

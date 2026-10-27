@@ -1,4 +1,5 @@
 import '../core/api_exception.dart';
+import '../core/wib_time.dart';
 import 'patient.dart';
 import 'checkin_result.dart';
 
@@ -55,6 +56,14 @@ String checkinTime(Object? value) {
   return text;
 }
 
+/// A persisted report must carry an explicit instant. A zone-less or
+/// calendar-invalid value is rejected instead of being read as epoch or now.
+String checkinInstant(Object? value) {
+  final text = patientText(value);
+  if (wibLabel(text) == null) throw const InvalidResponseException();
+  return text;
+}
+
 num checkinNumber(Object? value) {
   if (value is! num || !value.isFinite || value < 0) {
     throw const InvalidResponseException();
@@ -102,6 +111,14 @@ class CheckinRecord {
   final ProcessingState processing;
   final CheckinBaseline? baseline;
   final CheckinOutcome? outcome;
+
+  /// Display label in WIB; [createdAt] keeps the raw server instant so list
+  /// ordering and identity never depend on the rendered timezone.
+  ///
+  /// [fromJson] rejects instants that cannot be formatted, so the fallback
+  /// only guards direct construction.
+  String get createdLabel => wibLabel(createdAt) ?? 'Waktu tidak tersedia';
+
   factory CheckinRecord.fromJson(Object? value) {
     final json = patientObject(value), p = patientObject(json['processing']);
     final id = patientText(json['id']),
@@ -175,7 +192,7 @@ class CheckinRecord {
       id: id,
       patientId: patientId,
       message: patientText(json['message']),
-      createdAt: checkinTime(json['createdAt']),
+      createdAt: checkinInstant(json['createdAt']),
       processing: processing,
       baseline: baseline,
       outcome: outcome,

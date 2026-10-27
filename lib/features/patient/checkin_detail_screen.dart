@@ -93,7 +93,7 @@ class CheckinEvidence extends StatelessWidget {
       ],
       Text('Laporan tersimpan', style: Theme.of(context).textTheme.titleLarge),
       const SizedBox(height: 12),
-      Text('Waktu kirim: ${record.createdAt}'),
+      Text('Waktu kirim: ${record.createdLabel}'),
       const SizedBox(height: 12),
       Semantics(liveRegion: true, child: Text(record.processing.label)),
       const SizedBox(height: 12),

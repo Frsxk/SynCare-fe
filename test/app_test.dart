@@ -302,14 +302,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Riwayat laporan saya'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('Laporan 2026-10-25T00:00:00Z'),
+        find.text('Laporan 2026-10-25 07:00 WIB'),
         200,
       );
-      await tester.tap(find.text('Laporan 2026-10-25T00:00:00Z'));
+      await tester.tap(find.text('Laporan 2026-10-25 07:00 WIB'));
       await tester.pumpAndSettle();
       expect(find.text('Detail laporan'), findsOneWidget);
       expect(find.text('ID laporan: report-a'), findsNothing);
       expect(find.text('Rincian laporan'), findsNothing);
+      expect(
+        find.text('Waktu kirim: 2026-10-25 07:00 WIB'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('2026-10-25T00:00:00Z'), findsNothing);
       expect(find.text('Data sintetis khusus unit test.'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await scope.read(sessionControllerProvider.notifier).logout();

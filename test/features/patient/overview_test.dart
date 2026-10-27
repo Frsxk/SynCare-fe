@@ -34,6 +34,11 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('LOW'), findsOneWidget);
+      expect(
+        find.text('Waktu laporan mendesak terakhir: 2026-10-25 07:00 WIB'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('2026-10-25T00:00:00Z'), findsNothing);
       expect(find.text('Kutipan mendesak dari F2 sintetis'), findsOneWidget);
       expect(
         find.textContaining('Aplikasi tidak melakukan panggilan'),

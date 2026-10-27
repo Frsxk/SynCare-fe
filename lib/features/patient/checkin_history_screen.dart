@@ -114,7 +114,7 @@ class CheckinHistoryRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: 8,
         children: [
-          Text('Laporan ${record.createdAt}'),
+          Text('Laporan ${record.createdLabel}'),
           Text(record.processing.label),
           if (record.outcome is UrgentCheckinOutcome)
             const Text('Peringatan mendesak dari F2'),

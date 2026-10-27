@@ -29,6 +29,40 @@ void main() {
       }
     },
   );
+  test('createdLabel is WIB while createdAt stays the raw UTC value', () {
+    final record = checkinFixture();
+    expect(record.createdAt, '2026-10-25T00:00:00Z');
+    expect(record.createdLabel, '2026-10-25 07:00 WIB');
+
+    final late = CheckinRecord.fromJson(<String, dynamic>{
+      ...checkinJson(),
+      'createdAt': '2026-10-25T18:30:00Z',
+    });
+    expect(late.createdAt, '2026-10-25T18:30:00Z');
+    expect(late.createdLabel, '2026-10-26 01:30 WIB');
+
+    final equivalentOffset = CheckinRecord.fromJson(<String, dynamic>{
+      ...checkinJson(),
+      'createdAt': '2026-10-25T07:00:00+07:00',
+    });
+    expect(equivalentOffset.createdAt, '2026-10-25T07:00:00+07:00');
+    expect(equivalentOffset.createdLabel, '2026-10-25 07:00 WIB');
+  });
+  test('missing or invalid createdAt fails validation instead of 1970 or now', () {
+    final missing = checkinJson()..remove('createdAt');
+    for (final Map<String, dynamic> json in <Map<String, dynamic>>[
+      missing,
+      <String, dynamic>{...checkinJson(), 'createdAt': ''},
+      <String, dynamic>{...checkinJson(), 'createdAt': 'not-a-date'},
+      <String, dynamic>{...checkinJson(), 'createdAt': '2026-10-25'},
+      <String, dynamic>{...checkinJson(), 'createdAt': '2026-13-01T00:00:00Z'},
+    ]) {
+      expect(
+        () => CheckinRecord.fromJson(json),
+        throwsA(isA<InvalidResponseException>()),
+      );
+    }
+  });
   test(
     'foreign output/baseline, fabricated date and nonterminal success rejected',
     () {

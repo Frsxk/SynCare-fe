@@ -7,6 +7,7 @@ import 'package:syncare_flutter/features/patient/homecare_providers.dart';
 import 'package:syncare_flutter/features/patient/booking_request_screen.dart';
 import 'package:syncare_flutter/features/patient/homecare_screen.dart';
 import 'package:syncare_flutter/models/homecare.dart';
+import '../../helpers/error_fixture.dart';
 import '../../helpers/fakes.dart';
 import '../../helpers/homecare_fixture.dart';
 import '../../helpers/pump_app.dart';
@@ -48,6 +49,55 @@ void main() {
       disposed.dispose();
       late.complete(bookingFixture());
       await call;
+    },
+  );
+  test(
+    'typed outcome_unknown keeps the original BookingInput and key without auto resend',
+    () async {
+      final keys = <String>[], inputs = <BookingInput>[];
+      var calls = 0;
+      final api = FakeSyncareApi()
+        ..onRequestBooking = (id, input, key) async {
+          calls++;
+          keys.add(key);
+          inputs.add(input);
+          if (calls == 1) {
+            throw apiExceptionForStatus(
+              502,
+              nestedErrorBody(
+                'outcome_unknown',
+                message: 'Hasil permintaan belum dapat dipastikan.',
+                retryable: false,
+              ),
+            );
+          }
+          return bookingFixture(patientId: id);
+        };
+      final controller = BookingSubmitController(api, 'patient-a');
+      addTearDown(controller.dispose);
+      await controller.submit(bookingInput);
+      expect(calls, 1);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(calls, 1, reason: 'retryable must never auto-resend');
+      expect(controller.state, isA<BookingUnknown>());
+      expect(
+        (controller.state as BookingUnknown).error,
+        isA<OutcomeUnknownException>(),
+      );
+      await controller.submit(
+        BookingInput(
+          serviceId: bookingInput.serviceId,
+          fullAddress: 'Alamat yang diedit',
+          kelurahan: bookingInput.kelurahan,
+          kecamatan: bookingInput.kecamatan,
+          city: bookingInput.city,
+          startAt: bookingInput.startAt,
+          endAt: bookingInput.endAt,
+        ),
+      );
+      expect(calls, 2);
+      expect(keys[1], keys[0]);
+      expect(inputs[1], same(inputs[0]));
     },
   );
   test(
@@ -150,7 +200,16 @@ void main() {
           const ServicePage([demoService], null);
       api.onRequestBooking = (id, input, key) async {
         keys.add(key);
-        if (calls++ == 0) throw const NetworkException();
+        if (calls++ == 0) {
+          throw apiExceptionForStatus(
+            502,
+            nestedErrorBody(
+              'outcome_unknown',
+              message: 'Hasil permintaan belum dapat dipastikan.',
+              retryable: false,
+            ),
+          );
+        }
         return bookingFixture();
       };
       final controller = BookingSubmitController(api, 'patient-a');

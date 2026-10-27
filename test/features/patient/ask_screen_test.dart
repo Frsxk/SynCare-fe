@@ -9,6 +9,7 @@ import 'package:syncare_flutter/features/patient/qa_outcome_panel.dart';
 import 'package:syncare_flutter/models/ask_answer.dart';
 import 'package:syncare_flutter/widgets/disclaimer_banner.dart';
 import 'package:syncare_flutter/widgets/source_chip.dart';
+import '../../helpers/error_fixture.dart';
 import '../../helpers/fakes.dart';
 import '../../helpers/pump_app.dart';
 
@@ -213,6 +214,51 @@ void main() {
       expect(find.text(refusal), findsOneWidget);
       expect(find.byType(SourceChip), findsNothing);
       expect(find.text('Jawaban F5'), findsNothing);
+    },
+  );
+  testWidgets(
+    'nested 502 invalid flow output never claims the approval stream failed',
+    (tester) async {
+      final api = FakeSyncareApi()
+        ..onAsk = ({required patientId, required query}) async => throw apiExceptionForStatus(
+          502,
+          nestedErrorBody(
+            'invalid_flow_output',
+            message: 'Hasil pemrosesan tidak dapat ditampilkan.',
+            requestId: 'req-qa-flow',
+          ),
+        );
+      await pump(tester, api);
+      await send(tester, 'pertanyaan');
+      await tester.pumpAndSettle();
+      expect(find.text('Hasil belum dapat ditampilkan'), findsOneWidget);
+      expect(
+        find.textContaining('Jawaban atau hasil pemrosesan'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('aliran peristiwa'), findsNothing);
+      expect(find.text('Tidak bisa membuka aliran peristiwa'), findsNothing);
+      expect(find.textContaining('approval'), findsNothing);
+    },
+  );
+  testWidgets(
+    'nested 502 outcome unknown is distinct and has no blind resend',
+    (tester) async {
+      final api = FakeSyncareApi()
+        ..onAsk = ({required patientId, required query}) async => throw apiExceptionForStatus(
+          502,
+          nestedErrorBody(
+            'outcome_unknown',
+            message: 'Hasil permintaan belum dapat dipastikan.',
+            requestId: 'req-qa-outcome',
+          ),
+        );
+      await pump(tester, api);
+      await send(tester, 'pertanyaan');
+      await tester.pumpAndSettle();
+      expect(find.text('Status belum pasti'), findsOneWidget);
+      expect(find.textContaining('aliran peristiwa'), findsNothing);
+      expect(find.text('Coba lagi'), findsNothing);
     },
   );
   testWidgets(

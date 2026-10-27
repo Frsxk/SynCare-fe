@@ -144,6 +144,7 @@ class _PatientCheckinScreenState
         error: error,
         onRetry: _submit,
         onReauth: () => showTokenDialog(context, ref),
+        tokenReauth: true,
       );
     }
 

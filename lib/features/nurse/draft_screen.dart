@@ -184,6 +184,7 @@ class _NurseDraftScreenState extends ConsumerState<NurseDraftScreen> {
         error: _error!,
         onRetry: _submit,
         onReauth: () => showTokenDialog(context, ref),
+        tokenReauth: true,
       );
     }
 

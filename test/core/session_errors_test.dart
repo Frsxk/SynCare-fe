@@ -24,6 +24,27 @@ void main() {
     },
   );
   testWidgets(
+    'expired session offers sign-in, never a manual patient token',
+    (tester) async {
+      var reauthCalls = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ErrorState(
+              error: const UnauthorizedException(),
+              onReauth: () => reauthCalls++,
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Masuk kembali'), findsOneWidget);
+      expect(find.text('Perbarui token'), findsNothing);
+      expect(find.textContaining('Token akses'), findsNothing);
+      await tester.tap(find.text('Masuk kembali'));
+      expect(reauthCalls, 1);
+    },
+  );
+  testWidgets(
     'permission denial renders a specific next step without a misleading read-only or token claim',
     (tester) async {
       await tester.pumpWidget(

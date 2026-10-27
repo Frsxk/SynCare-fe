@@ -7,6 +7,7 @@ import 'package:syncare_flutter/features/patient/emergency_notice.dart';
 import 'package:syncare_flutter/features/patient/checkin_detail_screen.dart';
 import 'package:syncare_flutter/models/checkin_record.dart';
 import '../../helpers/checkin_fixture.dart';
+import '../../helpers/error_fixture.dart';
 import '../../helpers/pump_app.dart';
 
 void main() {
@@ -90,6 +91,45 @@ void main() {
           .widgetList<Semantics>(find.byType(Semantics))
           .any((s) => s.properties.liveRegion == true);
       expect(live, isTrue);
+    },
+  );
+  testWidgets(
+    'nested guidance-unavailable keeps the known urgent reason and invents no hotline',
+    (tester) async {
+      await tester.pumpWidget(
+        wrapScreen(
+          const Scaffold(
+            body: EmergencyNotice(
+              reason: 'F2 synthetic reason',
+              alertEvidence: 'queued',
+            ),
+          ),
+          overrides: [
+            emergencyGuidanceProvider.overrideWith(
+              (_) =>
+                  throw apiExceptionForStatus(
+                    503,
+                    nestedErrorBody(
+                      'emergency_guidance_unavailable',
+                      message: 'Informasi layanan darurat belum tersedia.',
+                    ),
+                  ),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('F2 synthetic reason'), findsOneWidget);
+      expect(
+        find.textContaining('Aplikasi tidak mengirim bantuan'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Kontak darurat terverifikasi belum tersedia'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('119'), findsNothing);
+      expect(find.textContaining('Panduan darurat belum tersedia'), findsNothing);
     },
   );
   testWidgets(

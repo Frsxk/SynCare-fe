@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncare_flutter/core/api_exception.dart';
 import 'package:syncare_flutter/features/patient/checkin_providers.dart';
 import 'package:syncare_flutter/models/checkin_record.dart';
+import '../../helpers/error_fixture.dart';
 import '../../helpers/fakes.dart';
 import '../../helpers/checkin_fixture.dart';
 
@@ -47,6 +48,75 @@ void main() {
       controller.startNew();
       await controller.submit('original');
       expect(keys[2], isNot(keys[0]));
+    },
+  );
+  test(
+    'nested outcome_unknown and retryable dependency keep exact intent without auto resend',
+    () async {
+      for (final (int status, String body) in <(int, String)>[
+        (502, nestedErrorBody('outcome_unknown', retryable: false)),
+        (503, nestedErrorBody('dependency_unavailable', retryable: true)),
+      ]) {
+        final keys = <String>[], messages = <String>[];
+        var calls = 0;
+        final api = FakeSyncareApi()
+          ..onSubmitCheckin = (id, message, key) async {
+            calls++;
+            keys.add(key);
+            messages.add(message);
+            if (calls == 1) throw apiExceptionForStatus(status, body);
+            return checkinFixture(patientId: id);
+          };
+        final controller = CheckinSubmitController(api, 'patient-a');
+        addTearDown(controller.dispose);
+        await controller.submit('original body');
+        expect(calls, 1);
+        expect(controller.state, isA<CheckinSendFailure>());
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        expect(calls, 1, reason: 'retryable must never auto-resend');
+        await controller.submit('edited after unknown');
+        expect(calls, 2);
+        expect(keys[1], keys[0]);
+        expect(messages, <String>['original body', 'original body']);
+      }
+    },
+  );
+  test(
+    'nested validation_failed retains the draft and an edited resubmit uses a new intent',
+    () async {
+      final keys = <String>[], messages = <String>[];
+      var calls = 0;
+      final api = FakeSyncareApi()
+        ..onSubmitCheckin = (id, message, key) async {
+          calls++;
+          keys.add(key);
+          messages.add(message);
+          if (calls == 1) {
+            throw apiExceptionForStatus(
+              422,
+              nestedErrorBody(
+                'validation_failed',
+                message: 'followup_date wajib diisi.',
+              ),
+            );
+          }
+          return checkinFixture(patientId: id);
+        };
+      final controller = CheckinSubmitController(api, 'patient-a');
+      addTearDown(controller.dispose);
+      await controller.submit('original body');
+      expect(calls, 1);
+      expect(controller.state, isA<CheckinDraft>());
+      expect(
+        (controller.state as CheckinDraft).error,
+        isA<ValidationException>(),
+      );
+      expect(controller.message, 'original body');
+      await controller.submit('corrected body');
+      expect(calls, 2);
+      expect(messages, <String>['original body', 'corrected body']);
+      expect(keys[1], isNot(keys[0]));
+      expect(controller.state, isA<CheckinSaved>());
     },
   );
   test(

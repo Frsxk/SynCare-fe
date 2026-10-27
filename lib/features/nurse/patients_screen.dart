@@ -48,6 +48,7 @@ class NursePatientsScreen extends ConsumerWidget {
                     error: error,
                     onRetry: () => ref.invalidate(plansProvider),
                     onReauth: () => showTokenDialog(context, ref),
+                    tokenReauth: true,
                   ),
                   data: (PlansResponse response) {
                     final List<ApprovedPlanRecord> plans = response.plans;

@@ -184,4 +184,22 @@ void main() {
     expect(find.text('Memuat rencana…'), findsNothing);
     expect(find.text('Pemantauan ketat selama 7 hari.'), findsOneWidget);
   });
+
+  testWidgets(
+    'unauthorized plan keeps the retained manual-token reauth affordance',
+    (tester) async {
+      await pumpScreen(
+        tester,
+        onGetPlan: (_) async => throw const UnauthorizedException(),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ErrorState), findsOneWidget);
+      expect(find.text('Perbarui token'), findsOneWidget);
+      expect(find.text('Masuk kembali'), findsNothing);
+      await tester.tap(find.text('Perbarui token'));
+      await tester.pumpAndSettle();
+      expect(find.text('Perbarui token akses'), findsOneWidget);
+    },
+  );
 }

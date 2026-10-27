@@ -31,7 +31,8 @@ sealed class CheckinSubmitState {
 }
 
 class CheckinDraft extends CheckinSubmitState {
-  const CheckinDraft();
+  const CheckinDraft({this.error});
+  final Object? error;
 }
 
 class CheckinUnavailable extends CheckinSubmitState {
@@ -71,10 +72,11 @@ class CheckinSubmitController extends StateNotifier<CheckinSubmitState> {
   final SyncareApi api;
   final String? patientId;
   ({String message, String key})? _intent;
+  String? _draftMessage;
   Timer? _poll;
   int _polls = 0;
   int _generation = 0;
-  String get message => _intent?.message ?? '';
+  String get message => _intent?.message ?? _draftMessage ?? '';
   Future<void> submit(String message) async {
     final ownId = patientId;
     if (ownId == null || state is CheckinUnavailable) return;
@@ -82,6 +84,7 @@ class CheckinSubmitController extends StateNotifier<CheckinSubmitState> {
     if (message.trim().isEmpty) return;
     _intent ??= (message: message, key: requestUuid());
     final intent = _intent!;
+    _draftMessage = intent.message;
     final generation = _generation;
     state = const CheckinSending();
     try {
@@ -92,16 +95,25 @@ class CheckinSubmitController extends StateNotifier<CheckinSubmitState> {
       );
       if (!mounted || generation != _generation) return;
       if (record.patientId != patientId) throw const InvalidResponseException();
+      _draftMessage = null;
       state = CheckinSaved(record);
       _schedule(record);
     } catch (error) {
       if (mounted && generation == _generation) {
-        state =
-            error is UnauthorizedException ||
-                error is ForbiddenException ||
-                error is NotFoundException
-            ? CheckinUnavailable(error)
-            : CheckinSendFailure(error);
+        if (error is ValidationException) {
+          // A 422 is a definitive rejection: nothing was stored, so the
+          // patient may correct the draft. The rejected text stays available
+          // and the next submit is a new intent with a new key.
+          _intent = null;
+          _draftMessage = intent.message;
+          state = CheckinDraft(error: error);
+        } else if (error is UnauthorizedException ||
+            error is ForbiddenException ||
+            error is NotFoundException) {
+          state = CheckinUnavailable(error);
+        } else {
+          state = CheckinSendFailure(error);
+        }
       }
     }
   }
@@ -148,6 +160,7 @@ class CheckinSubmitController extends StateNotifier<CheckinSubmitState> {
     _generation++;
     _poll?.cancel();
     _intent = null;
+    _draftMessage = null;
     _polls = 0;
     state = const CheckinDraft();
   }

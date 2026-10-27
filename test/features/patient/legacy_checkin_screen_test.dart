@@ -295,4 +295,25 @@ void main() {
     expect(find.text('Tier saat ini: LOW'), findsOneWidget);
     expect(find.textContaining('Tier berubah'), findsNothing);
   });
+
+  testWidgets(
+    'unauthorized check-in keeps the retained manual-token reauth affordance',
+    (tester) async {
+      final FakeSyncareApi api = FakeSyncareApi()
+        ..onCheckin =
+            ({required String patientId, required String message}) async =>
+                throw const UnauthorizedException();
+
+      await _pumpScreen(tester, api);
+      await _submitMessage(tester, 'sesak napas sejak pagi');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Perbarui token'), findsOneWidget);
+      expect(find.text('Masuk kembali'), findsNothing);
+      await tester.ensureVisible(find.text('Perbarui token'));
+      await tester.tap(find.text('Perbarui token'));
+      await tester.pumpAndSettle();
+      expect(find.text('Perbarui token akses'), findsOneWidget);
+    },
+  );
 }

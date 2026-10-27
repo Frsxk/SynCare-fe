@@ -7,6 +7,7 @@ import 'package:syncare_flutter/features/patient/homecare_providers.dart';
 import 'package:syncare_flutter/features/patient/booking_detail_screen.dart';
 import 'package:syncare_flutter/features/patient/booking_history_screen.dart';
 import 'package:syncare_flutter/models/homecare.dart';
+import '../../helpers/error_fixture.dart';
 import '../../helpers/fakes.dart';
 import '../../helpers/booking_lifecycle_fixture.dart';
 import '../../helpers/pump_app.dart';
@@ -52,6 +53,56 @@ void main() {
       );
       await controller.cancel('Baru');
       expect(keys.length, 2);
+    },
+  );
+  test(
+    'typed outcome_unknown never auto-resends and reconcile keeps key/version/reason',
+    () async {
+      final keys = <String>[], reasons = <String>[], versions = <int>[];
+      var calls = 0;
+      final api = FakeSyncareApi()
+        ..onGetBooking = (_) async => lifecycleFixture();
+      api.onCancelBooking = (id, version, reason, key) async {
+        calls++;
+        keys.add(key);
+        reasons.add(reason);
+        versions.add(version);
+        if (calls == 1) {
+          throw apiExceptionForStatus(
+            502,
+            nestedErrorBody(
+              'outcome_unknown',
+              message: 'Hasil permintaan belum dapat dipastikan.',
+              retryable: false,
+            ),
+          );
+        }
+        return lifecycleFixture(status: 'Cancelled');
+      };
+      final controller = BookingDetailController(api, 'patient-a', 'booking-a');
+      addTearDown(controller.dispose);
+      await controller.load();
+      await controller.cancel('Alasan asli');
+      expect(calls, 1);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(calls, 1, reason: 'retryable must never auto-resend');
+      expect(
+        (controller.state as BookingReady).feedback,
+        isA<CancelUnknown>(),
+      );
+      expect(
+        ((controller.state as BookingReady).feedback as CancelUnknown).error,
+        isA<OutcomeUnknownException>(),
+      );
+      await controller.cancel('Diedit setelah hasil belum pasti');
+      expect(calls, 2);
+      expect(keys[1], keys[0]);
+      expect(reasons, <String>['Alasan asli', 'Alasan asli']);
+      expect(versions, <int>[1, 1]);
+      expect(
+        (controller.state as BookingReady).feedback,
+        isA<CancelCommitted>(),
+      );
     },
   );
   test(

@@ -6,6 +6,7 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:syncare_flutter/core/api_client.dart';
 import 'package:syncare_flutter/core/api_exception.dart';
 
+import '../helpers/error_fixture.dart';
 import '../helpers/fakes.dart';
 
 const String _baseUrl = 'http://syncare.test';
@@ -175,6 +176,57 @@ void main() {
       await expectLater(
         harness.client.discharge('Pasien CHF.'),
         throwsA(isA<EngineWarmingException>()),
+      );
+    });
+
+    test('nested Q&A 502 invalid_flow_output is not a stream failure', () async {
+      final harness = _Harness();
+      harness.adapter.onPost(
+        '/api/v1/patients/demo-1/questions',
+        (server) => server.reply(
+          502,
+          nestedErrorBody(
+            'invalid_flow_output',
+            message: 'Hasil pemrosesan tidak dapat ditampilkan.',
+            requestId: 'req-qa',
+          ),
+        ),
+      );
+
+      await expectLater(
+        harness.client.ask(patientId: 'demo-1', query: 'Pertanyaan sintetis'),
+        throwsA(
+          isA<InvalidFlowOutputException>()
+              .having((error) => error.requestId, 'requestId', 'req-qa')
+              .having(
+                (error) => error,
+                'not SSE',
+                isNot(isA<StreamUnavailableException>()),
+              ),
+        ),
+      );
+    });
+
+    test('nested 503 dependency_unavailable stays retryable', () async {
+      final harness = _Harness();
+      harness.adapter.onGet(
+        '/api/health',
+        (server) => server.reply(
+          503,
+          nestedErrorBody(
+            'dependency_unavailable',
+            message: 'Layanan belum tersedia. Coba muat kembali.',
+            retryable: true,
+          ),
+        ),
+      );
+
+      await expectLater(
+        harness.client.health(),
+        throwsA(
+          isA<DependencyUnavailableException>()
+              .having((error) => error.retryable, 'retryable', isTrue),
+        ),
       );
     });
 

@@ -207,6 +207,7 @@ class LegacyPatientPlanScreen extends ConsumerWidget {
                       onRetry: () =>
                           ref.invalidate(approvedPlanProvider(patientId)),
                       onReauth: () => showTokenDialog(context, ref),
+                      tokenReauth: true,
                     );
                   },
                   data: (ApprovedPlanRecord record) =>

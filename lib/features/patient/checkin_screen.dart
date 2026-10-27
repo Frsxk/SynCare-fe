@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/api_exception.dart';
 import '../../widgets/content_width.dart';
 import '../../widgets/care_section.dart';
 import '../../widgets/disclaimer_banner.dart';
@@ -50,8 +51,23 @@ class _PatientCheckinScreenState extends ConsumerState<PatientCheckinScreen> {
         error: error,
         onReauth: () => context.go('/account'),
       ),
-      CheckinDraft() => const Text(
-        'Ceritakan keluhan atau perubahan kondisi Anda.',
+      CheckinDraft(:final error) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Ceritakan keluhan atau perubahan kondisi Anda.'),
+          if (error is ValidationException) ...[
+            const SizedBox(height: 12),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                'Laporan belum terkirim. Periksa kembali isi laporan, lalu kirim ulang.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
       CheckinSending() => Semantics(
         liveRegion: true,

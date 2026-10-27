@@ -1086,6 +1086,7 @@ class _NurseApprovalDeskScreenState
             error: error,
             onRetry: _retryAfterError,
             onReauth: () => showTokenDialog(context, ref),
+            tokenReauth: true,
           ),
         ),
         if (error is StreamUnavailableException) _buildServiceCheck(),

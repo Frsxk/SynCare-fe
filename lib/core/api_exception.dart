@@ -2,10 +2,25 @@ import 'dart:convert';
 
 /// Base type for every failure surfaced by the SynCare API layer.
 sealed class ApiException implements Exception {
-  const ApiException(this.message, {this.statusCode});
+  const ApiException(
+    this.message, {
+    this.statusCode,
+    this.code,
+    this.requestId,
+    this.retryable,
+  });
 
   final String message;
   final int? statusCode;
+
+  /// Closed domain code when the server supplied one.
+  final String? code;
+
+  /// Correlation id from a domain envelope; never rendered as patient copy.
+  final String? requestId;
+
+  /// Server retry hint. It never authorizes an automatic resend.
+  final bool? retryable;
 
   @override
   String toString() => message;
@@ -60,10 +75,97 @@ class BookingScheduleConflictException extends ApiException {
       );
 }
 
+class RateLimitedException extends ApiException {
+  const RateLimitedException({
+    String message = 'Terlalu banyak permintaan. Coba kembali nanti.',
+    String? requestId,
+    bool? retryable = false,
+  }) : super(
+         message,
+         statusCode: 429,
+         code: 'rate_limited',
+         requestId: requestId,
+         retryable: retryable,
+       );
+}
+
+/// A mutation may have reached the dependency, so its result is not known.
+/// Recovery must reconcile the original request, never blindly resend it.
+class OutcomeUnknownException extends ApiException {
+  const OutcomeUnknownException({
+    String message =
+        'Hasil permintaan belum dapat dipastikan. Periksa status sebelum mengirim ulang.',
+    String? requestId,
+    bool? retryable = false,
+  }) : super(
+         message,
+         statusCode: 502,
+         code: 'outcome_unknown',
+         requestId: requestId,
+         retryable: retryable,
+       );
+}
+
+class InvalidFlowOutputException extends ApiException {
+  const InvalidFlowOutputException({
+    String message = 'Hasil pemrosesan tidak dapat ditampilkan.',
+    String? requestId,
+    bool? retryable = false,
+  }) : super(
+         message,
+         statusCode: 502,
+         code: 'invalid_flow_output',
+         requestId: requestId,
+         retryable: retryable,
+       );
+}
+
+class DependencyUnavailableException extends ApiException {
+  const DependencyUnavailableException({
+    String message = 'Layanan belum tersedia. Coba muat kembali.',
+    String? requestId,
+    bool? retryable = true,
+  }) : super(
+         message,
+         statusCode: 503,
+         code: 'dependency_unavailable',
+         requestId: requestId,
+         retryable: retryable,
+       );
+}
+
+class EmergencyGuidanceUnavailableException extends ApiException {
+  const EmergencyGuidanceUnavailableException({
+    String message = 'Informasi layanan darurat belum tersedia.',
+    String? requestId,
+    bool? retryable = false,
+  }) : super(
+         message,
+         statusCode: 503,
+         code: 'emergency_guidance_unavailable',
+         requestId: requestId,
+         retryable: retryable,
+       );
+}
+
+class ProcessingFailedException extends ApiException {
+  const ProcessingFailedException({
+    String message = 'Proses belum berhasil diselesaikan.',
+    String? requestId,
+    bool? retryable = false,
+  }) : super(
+         message,
+         statusCode: 500,
+         code: 'processing_failed',
+         requestId: requestId,
+         retryable: retryable,
+       );
+}
+
 class StreamUnavailableException extends ApiException {
   const StreamUnavailableException([
     super.message = 'Aliran peristiwa tidak tersedia. Coba lagi.',
-  ]) : super(statusCode: 502);
+  ]) : super(statusCode: 502, code: 'events_unavailable');
 }
 
 class EngineWarmingException extends ApiException {
@@ -90,14 +192,135 @@ class InvalidResponseException extends ApiException {
   ]);
 }
 
+const String _genericFailure = 'Terjadi kesalahan. Coba lagi nanti.';
+
 /// Maps an HTTP status code and raw body to the matching [ApiException].
+///
+/// The domain envelope (`error.code`, `error.message`, `error.requestId`,
+/// `error.retryable`) wins over the HTTP status. Legacy flat string codes are
+/// retained only where an older route still serves them. An envelope without a
+/// usable string code keeps the closed status mapping instead of swallowing it.
+/// Unknown codes and malformed bodies never expose the server-supplied message.
 ApiException apiExceptionForStatus(int statusCode, String body) {
   final payload = _decodePayload(body);
-  final error = _stringField(payload, 'error');
-  final message = _stringField(payload, 'message');
-  final failure = payload?['error'];
-  if (statusCode == 409 && failure is Map<String, dynamic>) {
-    switch (failure['code']) {
+  final failure = _nestedFailure(payload);
+  final domainCode = failure == null ? null : _stringField(failure, 'code');
+  if (failure != null && domainCode != null) {
+    return _domainException(statusCode, domainCode, failure);
+  }
+
+  final legacyCode = _stringField(payload, 'error');
+  if (legacyCode != null) {
+    final legacy = _legacyException(
+      statusCode,
+      legacyCode,
+      _stringField(payload, 'message'),
+    );
+    if (legacy != null) {
+      return legacy;
+    }
+  }
+  return _statusFallback(statusCode);
+}
+
+ApiException _domainException(
+  int statusCode,
+  String code,
+  Map<String, dynamic> failure,
+) {
+  final message = _stringField(failure, 'message');
+  final requestId = _stringField(failure, 'requestId');
+  final retryable = failure['retryable'];
+  final retryHint = retryable is bool ? retryable : null;
+
+  switch (code) {
+    case 'unauthenticated':
+      return UnauthorizedException(message ?? 'Sesi tidak valid.');
+    case 'forbidden':
+      return const ForbiddenException();
+    case 'read_only_mode':
+      return ReadOnlyException(message ?? 'Server sedang dalam mode baca-saja.');
+    case 'not_found':
+      return NotFoundException(message ?? 'Data tidak ditemukan.');
+    case 'validation_failed':
+      return ValidationException(
+        message ?? 'Periksa kembali data yang dikirim.',
+      );
+    case 'version_conflict':
+      return const VersionConflictException();
+    case 'idempotency_conflict':
+      return const IdempotencyConflictException();
+    case 'booking_schedule_conflict':
+      return const BookingScheduleConflictException();
+    case 'rate_limited':
+      return RateLimitedException(
+        message: message ?? 'Terlalu banyak permintaan. Coba kembali nanti.',
+        requestId: requestId,
+        retryable: retryHint ?? false,
+      );
+    case 'outcome_unknown':
+      return OutcomeUnknownException(
+        message:
+            message ??
+            'Hasil permintaan belum dapat dipastikan. Periksa status sebelum mengirim ulang.',
+        requestId: requestId,
+        retryable: retryHint ?? false,
+      );
+    case 'invalid_flow_output':
+      return InvalidFlowOutputException(
+        message: message ?? 'Hasil pemrosesan tidak dapat ditampilkan.',
+        requestId: requestId,
+        retryable: retryHint ?? false,
+      );
+    case 'dependency_unavailable':
+      return DependencyUnavailableException(
+        message: message ?? 'Layanan belum tersedia. Coba muat kembali.',
+        requestId: requestId,
+        retryable: retryHint ?? true,
+      );
+    case 'emergency_guidance_unavailable':
+      return EmergencyGuidanceUnavailableException(
+        message: message ?? 'Informasi layanan darurat belum tersedia.',
+        requestId: requestId,
+        retryable: retryHint ?? false,
+      );
+    case 'processing_failed':
+      return ProcessingFailedException(
+        message: message ?? 'Proses belum berhasil diselesaikan.',
+        requestId: requestId,
+        retryable: retryHint ?? false,
+      );
+    default:
+      return UnexpectedApiException(_genericFailure, statusCode: statusCode);
+  }
+}
+
+ApiException? _legacyException(
+  int statusCode,
+  String code,
+  String? message,
+) {
+  if (statusCode == 401 &&
+      (code == 'unauthorized' || code == 'unauthenticated')) {
+    return UnauthorizedException(message ?? 'Sesi tidak valid.');
+  }
+  if (statusCode == 403 && code == 'read_only_mode') {
+    return ReadOnlyException(message ?? 'Server sedang dalam mode baca-saja.');
+  }
+  if (statusCode == 403 && code == 'forbidden') {
+    return const ForbiddenException();
+  }
+  if (statusCode == 404 && code == 'not_found') {
+    return NotFoundException(message ?? 'Data tidak ditemukan.');
+  }
+  if (statusCode == 422 &&
+      (code == 'validation' || code == 'validation_failed')) {
+    return ValidationException(
+      message ?? 'Periksa kembali data yang dikirim.',
+    );
+  }
+  if (statusCode == 409) {
+    switch (code) {
       case 'version_conflict':
         return const VersionConflictException();
       case 'idempotency_conflict':
@@ -106,46 +329,63 @@ ApiException apiExceptionForStatus(int statusCode, String body) {
         return const BookingScheduleConflictException();
     }
   }
+  if (statusCode == 429 && code == 'rate_limited') {
+    return RateLimitedException(
+      message: message ?? 'Terlalu banyak permintaan. Coba kembali nanti.',
+    );
+  }
+  if (statusCode == 502 &&
+      (code == 'events_unavailable' || code == 'stream_unavailable')) {
+    return StreamUnavailableException(
+      message ?? 'Aliran peristiwa tidak tersedia. Coba lagi.',
+    );
+  }
+  if (statusCode == 502 && code == 'langflow_http_error') {
+    return const InvalidFlowOutputException();
+  }
+  if (statusCode == 503 &&
+      (code == 'langflow_unreachable' || code == 'langflow_timeout')) {
+    return EngineWarmingException(
+      message ?? 'Mesin sedang disiapkan. Coba lagi sebentar lagi.',
+    );
+  }
+  if (statusCode == 503 && code == 'auth_not_configured') {
+    return ServerConfigException(message ?? code);
+  }
+  if (statusCode == 500 && code == 'internal') {
+    return const ProcessingFailedException();
+  }
+  return null;
+}
 
+ApiException _statusFallback(int statusCode) {
   switch (statusCode) {
     case 401:
-      return UnauthorizedException(message ?? 'Sesi tidak valid.');
+      return const UnauthorizedException();
     case 403:
-      if (error != 'read_only_mode') return const ForbiddenException();
-      return ReadOnlyException(
-        message ?? 'Server sedang dalam mode baca-saja.',
-      );
+      return const ForbiddenException();
     case 404:
-      return NotFoundException(message ?? 'Data tidak ditemukan.');
+      return const NotFoundException();
     case 422:
-      return ValidationException(message ?? 'Data tidak valid.');
-    case 502:
-      return StreamUnavailableException(
-        message ?? 'Aliran peristiwa tidak tersedia. Coba lagi.',
-      );
+      return const ValidationException('Periksa kembali data yang dikirim.');
+    case 429:
+      return const RateLimitedException();
     case 503:
-      final reason = error ?? '';
-      if (reason.contains('langflow_unreachable') ||
-          reason.contains('langflow_timeout')) {
-        return EngineWarmingException(
-          message ?? 'Mesin sedang disiapkan. Coba lagi sebentar lagi.',
-        );
-      }
-      if (reason.contains('auth_not_configured')) {
-        return ServerConfigException(
-          message ?? error ?? 'Konfigurasi server belum lengkap.',
-        );
-      }
-      return UnexpectedApiException(
-        message ?? error ?? 'Layanan sementara tidak tersedia.',
-        statusCode: statusCode,
-      );
+      return const DependencyUnavailableException();
     default:
-      return UnexpectedApiException(
-        message ?? error ?? 'Terjadi kesalahan (HTTP $statusCode).',
-        statusCode: statusCode,
-      );
+      return UnexpectedApiException(_genericFailure, statusCode: statusCode);
   }
+}
+
+Map<String, dynamic>? _nestedFailure(Map<String, dynamic>? payload) {
+  final value = payload?['error'];
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, item) => MapEntry(key.toString(), item));
+  }
+  return null;
 }
 
 Map<String, dynamic>? _decodePayload(String body) {

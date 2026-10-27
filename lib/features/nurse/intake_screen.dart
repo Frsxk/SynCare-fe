@@ -93,6 +93,7 @@ class _NurseIntakeScreenState extends ConsumerState<NurseIntakeScreen> {
                       error: _error!,
                       onRetry: _submit,
                       onReauth: () => showTokenDialog(context, ref),
+                      tokenReauth: true,
                     ),
                   )
                 else if (result == null)

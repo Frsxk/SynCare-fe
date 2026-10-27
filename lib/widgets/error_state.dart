@@ -10,11 +10,16 @@ class ErrorState extends StatelessWidget {
     required this.error,
     this.onRetry,
     this.onReauth,
+    this.tokenReauth = false,
   });
 
   final Object error;
   final VoidCallback? onRetry;
   final VoidCallback? onReauth;
+
+  /// Retained legacy nurse and patient widgets still offer the manual token
+  /// dialog. Routed patient screens use the default sign-in-again affordance.
+  final bool tokenReauth;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +84,13 @@ class ErrorState extends StatelessWidget {
                   const SizedBox(height: 20),
                   FilledButton.icon(
                     onPressed: actionCallback,
-                    icon: Icon(isAuth ? Icons.key_outlined : Icons.refresh),
+                    icon: Icon(
+                      isAuth
+                          ? tokenReauth
+                                ? Icons.key_outlined
+                                : Icons.login
+                          : Icons.refresh,
+                    ),
                     label: Text(copy.actionLabel),
                   ),
                 ],
@@ -93,21 +104,21 @@ class ErrorState extends StatelessWidget {
 
   _ErrorCopy _copyFor(Object error) {
     if (error is UnauthorizedException) {
-      return const _ErrorCopy(
-        icon: Icons.lock_outline,
+      return _ErrorCopy(
+        icon: tokenReauth ? Icons.lock_outline : Icons.login,
         title: 'Sesi tidak valid',
-        message: 'Token akses tidak berlaku. Perbarui token untuk melanjutkan.',
+        message: tokenReauth
+            ? 'Token akses tidak berlaku. Perbarui token untuk melanjutkan.'
+            : 'Sesi Anda telah berakhir. Masuk kembali untuk melanjutkan.',
         action: _ErrorAction.reauth,
-        actionLabel: 'Perbarui token',
+        actionLabel: tokenReauth ? 'Perbarui token' : 'Masuk kembali',
       );
     }
     if (error is ReadOnlyException) {
       return const _ErrorCopy(
         icon: Icons.visibility_off_outlined,
-        title: 'Server dalam mode baca-saja',
-        message:
-            'Aksi ini tidak tersedia selama server berjalan dalam mode '
-            'baca-saja.',
+        title: 'Perubahan tidak dapat dikirim',
+        message: 'Layanan sedang tidak menerima perubahan. Coba lagi nanti.',
       );
     }
     if (error is ForbiddenException) {
@@ -134,14 +145,62 @@ class ErrorState extends StatelessWidget {
         message: (error as ApiException).message,
       );
     }
+    if (error is RateLimitedException) {
+      return const _ErrorCopy(
+        icon: Icons.timer_outlined,
+        title: 'Terlalu banyak permintaan',
+        message: 'Tunggu sebentar, lalu coba lagi.',
+      );
+    }
+    if (error is OutcomeUnknownException) {
+      return const _ErrorCopy(
+        icon: Icons.help_outline,
+        title: 'Status belum pasti',
+        message:
+            'Hasil permintaan belum dapat dipastikan. Periksa status sebelum mengirim ulang.',
+      );
+    }
+    if (error is InvalidFlowOutputException) {
+      return const _ErrorCopy(
+        icon: Icons.description_outlined,
+        title: 'Hasil belum dapat ditampilkan',
+        message:
+            'Jawaban atau hasil pemrosesan belum dapat ditampilkan. Coba lagi nanti.',
+        action: _ErrorAction.retry,
+        actionLabel: 'Coba lagi',
+      );
+    }
+    if (error is DependencyUnavailableException) {
+      return const _ErrorCopy(
+        icon: Icons.cloud_off_outlined,
+        title: 'Layanan belum tersedia',
+        message: 'Layanan belum tersedia. Coba muat kembali.',
+        action: _ErrorAction.retry,
+        actionLabel: 'Coba lagi',
+      );
+    }
+    if (error is EmergencyGuidanceUnavailableException) {
+      return const _ErrorCopy(
+        icon: Icons.health_and_safety_outlined,
+        title: 'Panduan darurat belum tersedia',
+        message:
+            'Informasi layanan darurat belum tersedia. Segera cari pertolongan medis langsung.',
+      );
+    }
+    if (error is ProcessingFailedException) {
+      return const _ErrorCopy(
+        icon: Icons.error_outline,
+        title: 'Proses belum selesai',
+        message: 'Proses belum berhasil diselesaikan. Coba lagi nanti.',
+        action: _ErrorAction.retry,
+        actionLabel: 'Coba lagi',
+      );
+    }
     if (error is ServerConfigException) {
-      return _ErrorCopy(
+      return const _ErrorCopy(
         icon: Icons.settings_outlined,
-        title: 'Konfigurasi server bermasalah',
-        message: _messageOr(
-          error.message,
-          'Server belum dikonfigurasi dengan benar.',
-        ),
+        title: 'Layanan belum siap',
+        message: 'Layanan belum dapat digunakan saat ini. Coba lagi nanti.',
       );
     }
     if (error is StreamUnavailableException) {

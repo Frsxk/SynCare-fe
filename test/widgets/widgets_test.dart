@@ -173,7 +173,7 @@ void main() {
   });
 
   group('ErrorState', () {
-    testWidgets('Unauthorized asks for a new token and calls onReauth', (
+    testWidgets('Unauthorized asks to sign in again and calls onReauth', (
       WidgetTester tester,
     ) async {
       var reauthCalls = 0;
@@ -187,9 +187,35 @@ void main() {
       );
 
       expect(find.text('Sesi tidak valid'), findsOneWidget);
-      expect(find.text('Perbarui token'), findsOneWidget);
+      expect(
+        find.text('Sesi Anda telah berakhir. Masuk kembali untuk melanjutkan.'),
+        findsOneWidget,
+      );
+      expect(find.text('Masuk kembali'), findsOneWidget);
+      expect(find.text('Perbarui token'), findsNothing);
+      expect(find.textContaining('Token akses'), findsNothing);
       expect(find.text('Coba lagi'), findsNothing);
 
+      await tester.tap(find.text('Masuk kembali'));
+      expect(reauthCalls, 1);
+    });
+
+    testWidgets('tokenReauth preserves the retained nurse token affordance', (
+      WidgetTester tester,
+    ) async {
+      var reauthCalls = 0;
+
+      await _pump(
+        tester,
+        ErrorState(
+          error: const UnauthorizedException(),
+          tokenReauth: true,
+          onReauth: () => reauthCalls++,
+        ),
+      );
+
+      expect(find.text('Perbarui token'), findsOneWidget);
+      expect(find.text('Masuk kembali'), findsNothing);
       await tester.tap(find.text('Perbarui token'));
       expect(reauthCalls, 1);
     });
@@ -207,7 +233,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Server dalam mode baca-saja'), findsOneWidget);
+      expect(find.text('Perubahan tidak dapat dikirim'), findsOneWidget);
       expect(find.text('Coba lagi'), findsNothing);
       expect(retryCalls, 0);
     });
@@ -226,7 +252,7 @@ void main() {
       expect(find.text('Permintaan tidak valid'), findsOneWidget);
     });
 
-    testWidgets('ServerConfig shows the server message verbatim', (
+    testWidgets('ServerConfig hides configuration diagnostics', (
       WidgetTester tester,
     ) async {
       await _pump(
@@ -236,8 +262,9 @@ void main() {
         ),
       );
 
-      expect(find.text('SYNCARE_API_KEY belum diatur.'), findsOneWidget);
-      expect(find.text('Konfigurasi server bermasalah'), findsOneWidget);
+      expect(find.text('Layanan belum siap'), findsOneWidget);
+      expect(find.text('SYNCARE_API_KEY belum diatur.'), findsNothing);
+      expect(find.textContaining('SYNCARE_API_KEY'), findsNothing);
     });
 
     testWidgets('StreamUnavailable offers retry', (WidgetTester tester) async {
@@ -298,6 +325,115 @@ void main() {
       await _pump(tester, const ErrorState(error: NotFoundException()));
 
       expect(find.text('Data tidak ditemukan'), findsOneWidget);
+    });
+
+    testWidgets('rate limited asks the patient to wait without a retry storm', (
+      WidgetTester tester,
+    ) async {
+      var retryCalls = 0;
+      await _pump(
+        tester,
+        ErrorState(
+          error: const RateLimitedException(),
+          onRetry: () => retryCalls++,
+        ),
+      );
+
+      expect(find.text('Terlalu banyak permintaan'), findsOneWidget);
+      expect(find.text('Coba lagi'), findsNothing);
+      expect(retryCalls, 0);
+    });
+
+    testWidgets('outcome unknown never offers a blind resend', (
+      WidgetTester tester,
+    ) async {
+      var retryCalls = 0;
+      await _pump(
+        tester,
+        ErrorState(
+          error: const OutcomeUnknownException(),
+          onRetry: () => retryCalls++,
+        ),
+      );
+
+      expect(find.text('Status belum pasti'), findsOneWidget);
+      expect(
+        find.textContaining('Periksa status sebelum mengirim ulang'),
+        findsOneWidget,
+      );
+      expect(find.text('Coba lagi'), findsNothing);
+      expect(retryCalls, 0);
+    });
+
+    testWidgets('invalid flow output never claims the approval stream failed', (
+      WidgetTester tester,
+    ) async {
+      var retryCalls = 0;
+      await _pump(
+        tester,
+        ErrorState(
+          error: const InvalidFlowOutputException(),
+          onRetry: () => retryCalls++,
+        ),
+      );
+
+      expect(find.text('Hasil belum dapat ditampilkan'), findsOneWidget);
+      expect(find.textContaining('aliran peristiwa'), findsNothing);
+      expect(find.text('Tidak bisa membuka aliran peristiwa'), findsNothing);
+      await tester.tap(find.text('Coba lagi'));
+      expect(retryCalls, 1);
+    });
+
+    testWidgets('dependency unavailable offers a real retry', (
+      WidgetTester tester,
+    ) async {
+      var retryCalls = 0;
+      await _pump(
+        tester,
+        ErrorState(
+          error: const DependencyUnavailableException(),
+          onRetry: () => retryCalls++,
+        ),
+      );
+
+      expect(find.text('Layanan belum tersedia'), findsOneWidget);
+      await tester.tap(find.text('Coba lagi'));
+      expect(retryCalls, 1);
+    });
+
+    testWidgets('guidance unavailable never invents an emergency contact', (
+      WidgetTester tester,
+    ) async {
+      await _pump(
+        tester,
+        const ErrorState(
+          error: EmergencyGuidanceUnavailableException(),
+        ),
+      );
+
+      expect(find.text('Panduan darurat belum tersedia'), findsOneWidget);
+      expect(
+        find.textContaining('Segera cari pertolongan medis langsung'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('119'), findsNothing);
+    });
+
+    testWidgets('processing failure is retryable with bounded patient copy', (
+      WidgetTester tester,
+    ) async {
+      var retryCalls = 0;
+      await _pump(
+        tester,
+        ErrorState(
+          error: const ProcessingFailedException(),
+          onRetry: () => retryCalls++,
+        ),
+      );
+
+      expect(find.text('Proses belum selesai'), findsOneWidget);
+      await tester.tap(find.text('Coba lagi'));
+      expect(retryCalls, 1);
     });
 
     testWidgets('unknown errors hide internals and show generic copy', (

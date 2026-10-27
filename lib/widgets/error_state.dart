@@ -110,11 +110,28 @@ class ErrorState extends StatelessWidget {
             'baca-saja.',
       );
     }
+    if (error is ForbiddenException) {
+      return const _ErrorCopy(
+        icon: Icons.lock_outline,
+        title: 'Akses tidak diizinkan',
+        message:
+            'Akun ini belum memiliki akses untuk tindakan tersebut. Hubungi perawat atau operator.',
+      );
+    }
     if (error is ValidationException) {
       return _ErrorCopy(
         icon: Icons.rule_outlined,
         title: 'Permintaan tidak valid',
         message: _messageOr(error.message, 'Data yang dikirim tidak valid.'),
+      );
+    }
+    if (error is VersionConflictException ||
+        error is IdempotencyConflictException ||
+        error is BookingScheduleConflictException) {
+      return _ErrorCopy(
+        icon: Icons.refresh,
+        title: 'Data perlu ditinjau kembali',
+        message: (error as ApiException).message,
       );
     }
     if (error is ServerConfigException) {

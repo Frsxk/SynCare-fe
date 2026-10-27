@@ -22,6 +22,11 @@ class ReadOnlyException extends ApiException {
   ]) : super(statusCode: 403);
 }
 
+class ForbiddenException extends ApiException {
+  const ForbiddenException()
+    : super('Anda tidak memiliki akses untuk tindakan ini.', statusCode: 403);
+}
+
 class NotFoundException extends ApiException {
   const NotFoundException([super.message = 'Data tidak ditemukan.'])
     : super(statusCode: 404);
@@ -29,6 +34,30 @@ class NotFoundException extends ApiException {
 
 class ValidationException extends ApiException {
   const ValidationException(super.message) : super(statusCode: 422);
+}
+
+class VersionConflictException extends ApiException {
+  const VersionConflictException()
+    : super(
+        'Data telah berubah. Muat data terbaru sebelum melanjutkan.',
+        statusCode: 409,
+      );
+}
+
+class IdempotencyConflictException extends ApiException {
+  const IdempotencyConflictException()
+    : super(
+        'Identitas permintaan telah digunakan untuk data berbeda. Periksa status terbaru.',
+        statusCode: 409,
+      );
+}
+
+class BookingScheduleConflictException extends ApiException {
+  const BookingScheduleConflictException()
+    : super(
+        'Jadwal petugas bertabrakan dengan kunjungan lain. Pilih waktu atau petugas lain.',
+        statusCode: 409,
+      );
 }
 
 class StreamUnavailableException extends ApiException {
@@ -66,11 +95,23 @@ ApiException apiExceptionForStatus(int statusCode, String body) {
   final payload = _decodePayload(body);
   final error = _stringField(payload, 'error');
   final message = _stringField(payload, 'message');
+  final failure = payload?['error'];
+  if (statusCode == 409 && failure is Map<String, dynamic>) {
+    switch (failure['code']) {
+      case 'version_conflict':
+        return const VersionConflictException();
+      case 'idempotency_conflict':
+        return const IdempotencyConflictException();
+      case 'booking_schedule_conflict':
+        return const BookingScheduleConflictException();
+    }
+  }
 
   switch (statusCode) {
     case 401:
       return UnauthorizedException(message ?? 'Sesi tidak valid.');
     case 403:
+      if (error != 'read_only_mode') return const ForbiddenException();
       return ReadOnlyException(
         message ?? 'Server sedang dalam mode baca-saja.',
       );

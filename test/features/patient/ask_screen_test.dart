@@ -1,235 +1,292 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncare_flutter/core/api_exception.dart';
-import 'package:syncare_flutter/core/config.dart';
-import 'package:syncare_flutter/core/providers.dart';
 import 'package:syncare_flutter/features/patient/ask_screen.dart';
+import 'package:syncare_flutter/features/patient/question_providers.dart';
+import 'package:syncare_flutter/features/patient/qa_outcome_panel.dart';
 import 'package:syncare_flutter/models/ask_answer.dart';
 import 'package:syncare_flutter/widgets/disclaimer_banner.dart';
-import 'package:syncare_flutter/widgets/empty_state.dart';
-import 'package:syncare_flutter/widgets/error_state.dart';
 import 'package:syncare_flutter/widgets/source_chip.dart';
-
 import '../../helpers/fakes.dart';
 import '../../helpers/pump_app.dart';
 
-void main() {
-  setUp(() {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-  });
+const refusal =
+    'Maaf, pertanyaan itu di luar cakupan rencana Anda. Silakan tanyakan ke perawat Anda atau hubungi hotline.';
+Map<String, dynamic> questionFixture() {
+  final citations = [
+    {
+      'id': 'patient-a:plan_text#1',
+      'label': 'rencana_disetujui_workflow_sintetis',
+      'provenance': 'approved_plan',
+      'quote': 'Aktivitas sumber satu.',
+    },
+    {
+      'id': 'hf-aftercare:section:0#1',
+      'label': 'draf_edukasi_tidak_disetujui',
+      'provenance': 'unapproved_education',
+      'quote': 'Edukasi sumber dua.',
+    },
+    {
+      'id': 'patient-a:care_intensity:0#1',
+      'label': 'rencana_disetujui_workflow_sintetis',
+      'provenance': 'approved_plan',
+      'quote': 'Aktivitas sumber tiga.',
+    },
+  ];
+  return {
+    'kind': 'answer',
+    'text':
+        'Disclaimer sintetis. ${citations.map((c) => '${c['quote']} [${c['id']} | ${c['label']}]').join(' ')}',
+    'disclaimer': 'Disclaimer sintetis.',
+    'citations': citations,
+  };
+}
 
-  Future<void> pumpAskScreen(WidgetTester tester, FakeSyncareApi api) async {
+void main() {
+  Future<void> pump(
+    WidgetTester tester,
+    FakeSyncareApi api, {
+    String? patient = 'patient-a',
+  }) async {
     await tester.pumpWidget(
       wrapScreen(
         const PatientAskScreen(),
-        overrides: <Override>[apiProvider.overrideWithValue(api)],
+        overrides: [
+          questionProvider.overrideWith(
+            (ref) => QuestionController(api, patient),
+          ),
+        ],
       ),
     );
     await tester.pumpAndSettle();
   }
 
-  Future<void> submitQuestion(WidgetTester tester, String query) async {
-    await tester.enterText(find.byType(TextField), query);
-    await tester.pump();
+  Future<void> send(WidgetTester tester, String text) async {
+    await tester.enterText(find.byType(TextField), text);
     await tester.tap(find.text('Tanya'));
     await tester.pump();
   }
 
   testWidgets(
-    'renders the disclaimer first, the patient caption, the empty state, and the form',
+    'a second explicit question after an answer sends a new request from the same composer',
     (tester) async {
-      final FakeSyncareApi api = FakeSyncareApi();
-
-      await pumpAskScreen(tester, api);
-
-      expect(find.byType(DisclaimerBanner), findsOneWidget);
+      var calls = 0;
+      final api = FakeSyncareApi()
+        ..onAsk = ({required patientId, required query}) async {
+          calls++;
+          return calls == 1
+              ? QuestionOutcome.fromJson(questionFixture(), patientId)
+              : const QuestionRefusal(refusal);
+        };
+      await pump(tester, api);
+      await send(tester, 'rencana');
+      await tester.pumpAndSettle();
+      expect(calls, 1);
       expect(
-        find.text('ID pasien: ${AppConfig.defaultPatientId}'),
-        findsOneWidget,
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNotNull,
       );
-
-      expect(find.byType(EmptyState), findsOneWidget);
-      expect(find.text('Belum ada pertanyaan'), findsOneWidget);
-      expect(
-        find.text(
-          'Tanyakan hal yang berkaitan dengan rencana tindak lanjut Anda.',
-        ),
-        findsOneWidget,
-      );
-      expect(find.byIcon(Icons.question_answer_outlined), findsOneWidget);
-
-      final TextField field = tester.widget<TextField>(find.byType(TextField));
-      expect(field.controller?.text ?? '', isEmpty);
-      expect(field.maxLines, greaterThan(1));
-      expect(find.text('Tanya'), findsOneWidget);
-      expect(find.byType(ErrorState), findsNothing);
-
-      final double bannerTop = tester
-          .getTopLeft(find.byType(DisclaimerBanner))
-          .dy;
-      final double emptyTop = tester.getTopLeft(find.byType(EmptyState)).dy;
-      expect(bannerTop, lessThan(emptyTop));
+      await send(tester, 'pertanyaan kedua');
+      await tester.pumpAndSettle();
+      expect(calls, 2);
+      expect(find.text(refusal), findsOneWidget);
     },
   );
 
-  testWidgets('rejects a blank question without calling the API', (
-    tester,
-  ) async {
-    final FakeSyncareApi api = FakeSyncareApi();
-    int calls = 0;
-    api.onAsk = ({required String patientId, required String query}) async {
-      calls++;
-      return const AskAnswer(
-        text: 'tidak seharusnya',
-        rawText: 'tidak seharusnya',
+  test(
+    'typed parser preserves all source references and rejects foreign source or raw/unknown outcomes',
+    () {
+      final answer =
+          QuestionOutcome.fromJson(questionFixture(), 'patient-a') as AskAnswer;
+      expect(answer.citations.length, 3);
+      expect(answer.citations[1].approved, false);
+      expect(answer.text, questionFixture()['text']);
+      for (final value in [
+        {'kind': 'unexpected'},
+        {'kind': 'error', 'code': 'retrieval_failed', 'reason': 'PRIVATE'},
+        'raw JSON',
+        {
+          'kind': 'answer',
+          'text': 'no citations',
+          'disclaimer': 'demo',
+          'citations': [],
+        },
+      ]) {
+        expect(
+          () => QuestionOutcome.fromJson(value, 'patient-a'),
+          throwsA(isA<InvalidResponseException>()),
+        );
+      }
+      expect(
+        () => QuestionOutcome.fromJson(questionFixture(), 'patient-b'),
+        throwsA(isA<InvalidResponseException>()),
       );
-    };
-
-    await pumpAskScreen(tester, api);
-    await submitQuestion(tester, '   ');
-
+    },
+  );
+  testWidgets(
+    'shows disclaimer, empty prompt and composer without a fallback patient caption',
+    (tester) async {
+      await pump(tester, FakeSyncareApi());
+      expect(find.byType(DisclaimerBanner), findsOneWidget);
+      expect(find.text('Belum ada pertanyaan'), findsOneWidget);
+      expect(find.textContaining('ID pasien:'), findsNothing);
+      expect(find.text('Tanya'), findsOneWidget);
+    },
+  );
+  testWidgets('blank question does not call API', (tester) async {
+    var calls = 0;
+    final api = FakeSyncareApi()
+      ..onAsk = ({required patientId, required query}) async {
+        calls++;
+        return const QuestionRefusal(refusal);
+      };
+    await pump(tester, api);
+    await send(tester, '   ');
     expect(calls, 0);
     expect(find.text('Tulis pertanyaan terlebih dahulu.'), findsOneWidget);
-    expect(find.byType(EmptyState), findsOneWidget);
   });
-
-  testWidgets('shows a spinner while the answer is pending', (tester) async {
-    final FakeSyncareApi api = FakeSyncareApi();
-    final Completer<AskAnswer> completer = Completer<AskAnswer>();
-    String? sentPatientId;
-    String? sentQuery;
-    api.onAsk = ({required String patientId, required String query}) {
-      sentPatientId = patientId;
-      sentQuery = query;
-      return completer.future;
-    };
-
-    await pumpAskScreen(tester, api);
-    await submitQuestion(tester, 'bolehkah saya berolahraga?');
-
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.text('Mencari jawaban…'), findsOneWidget);
-    expect(find.byType(EmptyState), findsNothing);
-    expect(sentPatientId, AppConfig.defaultPatientId);
-    expect(sentQuery, 'bolehkah saya berolahraga?');
-
-    final FilledButton button = tester.widget<FilledButton>(
-      find.byType(FilledButton),
-    );
-    expect(button.onPressed, isNull);
-
-    completer.complete(
-      const AskAnswer(
-        text: 'Anda boleh berjalan kaki 20 menit setiap pagi.',
-        rawText: 'Anda boleh berjalan kaki 20 menit setiap pagi.',
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(
-      find.text('Anda boleh berjalan kaki 20 menit setiap pagi.'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('renders a grounded answer verbatim with its source chip', (
-    tester,
-  ) async {
-    const String rawText =
-        'Istirahatkan kaki Anda dan hubungi klinik bila sesak memberat.\n\n'
-        '[patient:care_intensity:1#1 | f5_grounded_answer]';
-    final FakeSyncareApi api = FakeSyncareApi();
-    api.onAsk = ({required String patientId, required String query}) async =>
-        AskAnswer.fromText(rawText);
-
-    await pumpAskScreen(tester, api);
-    await submitQuestion(tester, 'apa yang harus saya lakukan?');
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text(
-        'Istirahatkan kaki Anda dan hubungi klinik bila sesak memberat.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.byType(SourceChip), findsOneWidget);
-    expect(
-      find.text('Sumber: patient:care_intensity:1#1 | f5_grounded_answer'),
-      findsOneWidget,
-    );
-    expect(
-      find.text(
-        'Jawaban berasal dari rencana yang disetujui. Bukan nasihat medis.',
-      ),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text('Teks verbatim'));
-    await tester.pumpAndSettle();
-
-    expect(find.text(rawText), findsOneWidget);
-  });
-
-  testWidgets('renders a plain refusal unchanged and without a source chip', (
-    tester,
-  ) async {
-    const String refusal =
-        'Saya belum bisa menjawab karena belum ada rencana tindak lanjut '
-        'yang disetujui.';
-    final FakeSyncareApi api = FakeSyncareApi();
-    api.onAsk = ({required String patientId, required String query}) async =>
-        AskAnswer.fromText(refusal);
-
-    await pumpAskScreen(tester, api);
-    await submitQuestion(tester, 'bolehkah saya berolahraga?');
-    await tester.pumpAndSettle();
-
-    expect(find.text(refusal), findsOneWidget);
-    expect(find.byType(SourceChip), findsNothing);
-    expect(find.textContaining('Sumber:'), findsNothing);
-  });
-
   testWidgets(
-    'maps StreamUnavailableException to the retry copy and retries the last query',
+    'pending blocks duplicate submit and publishes only the completed typed result',
     (tester) async {
-      final FakeSyncareApi api = FakeSyncareApi();
-      final List<String> queries = <String>[];
-      api.onAsk = ({required String patientId, required String query}) async {
-        queries.add(query);
-        if (queries.length == 1) {
-          throw const StreamUnavailableException();
-        }
-        return const AskAnswer(
-          text: 'Jawaban dari percobaan kedua.',
-          rawText: 'Jawaban dari percobaan kedua.',
-        );
-      };
-
-      await pumpAskScreen(tester, api);
-      await submitQuestion(tester, 'bolehkah saya berolahraga?');
+      var calls = 0;
+      final completer = Completer<QuestionOutcome>(),
+          api = FakeSyncareApi()
+            ..onAsk = ({required patientId, required query}) {
+              calls++;
+              expect(patientId, 'patient-a');
+              expect(query, 'rencana');
+              return completer.future;
+            };
+      await pump(tester, api);
+      await send(tester, ' rencana ');
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull,
+      );
+      expect(calls, 1);
+      completer.complete(const QuestionRefusal(refusal));
       await tester.pumpAndSettle();
-
-      expect(find.byType(ErrorState), findsOneWidget);
-      expect(find.text('Tidak bisa membuka aliran peristiwa'), findsOneWidget);
-      expect(find.text('Coba lagi'), findsOneWidget);
-      expect(find.textContaining('StreamUnavailableException'), findsNothing);
-
+      expect(find.text(refusal), findsOneWidget);
+    },
+  );
+  testWidgets(
+    'qa_multiple_provenance: three citations render and education is explicitly unapproved',
+    (tester) async {
+      final api = FakeSyncareApi()
+        ..onAsk = ({required patientId, required query}) async =>
+            QuestionOutcome.fromJson(questionFixture(), patientId);
+      await pump(tester, api);
+      await send(tester, 'rencana');
+      await tester.pumpAndSettle();
+      final outcome =
+          QuestionOutcome.fromJson(questionFixture(), 'patient-a') as AskAnswer;
+      expect(find.text(outcome.patientText), findsOneWidget);
+      expect(outcome.patientText, contains('Aktivitas sumber satu. [1]'));
+      expect(outcome.patientText, contains('Edukasi sumber dua. [2]'));
+      expect(outcome.rawText, questionFixture()['text']);
+      expect(find.byType(SourceChip), findsNWidgets(3));
+      expect(
+        find.text('Materi edukasi, belum disetujui perawat.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('patient-a:'), findsNothing);
+      expect(
+        find.textContaining('rencana_disetujui_workflow_sintetis'),
+        findsNothing,
+      );
+    },
+  );
+  testWidgets(
+    'refusal stays exactly verbatim without an approved-answer label',
+    (tester) async {
+      await pump(
+        tester,
+        FakeSyncareApi()
+          ..onAsk = ({required patientId, required query}) async =>
+              const QuestionRefusal(refusal),
+      );
+      await send(tester, 'di luar cakupan');
+      await tester.pumpAndSettle();
+      expect(find.text(refusal), findsOneWidget);
+      expect(find.byType(SourceChip), findsNothing);
+      expect(find.text('Jawaban F5'), findsNothing);
+    },
+  );
+  testWidgets(
+    'network error offers explicit retry of unchanged query, without automatic inference',
+    (tester) async {
+      var calls = 0;
+      final api = FakeSyncareApi()
+        ..onAsk = ({required patientId, required query}) async {
+          calls++;
+          expect(query, 'pertanyaan lama');
+          if (calls == 1) throw const NetworkException();
+          return const QuestionRefusal(refusal);
+        };
+      await pump(tester, api);
+      await send(tester, 'pertanyaan lama');
+      await tester.pumpAndSettle();
+      expect(calls, 1);
       await tester.ensureVisible(find.text('Coba lagi'));
-      await tester.pump();
       await tester.tap(find.text('Coba lagi'));
       await tester.pumpAndSettle();
-
-      expect(queries, <String>[
-        'bolehkah saya berolahraga?',
-        'bolehkah saya berolahraga?',
-      ]);
-      expect(find.byType(ErrorState), findsNothing);
-      expect(find.text('Jawaban dari percobaan kedua.'), findsOneWidget);
+      expect(calls, 2);
+      expect(find.text(refusal), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        'pertanyaan lama',
+      );
+    },
+  );
+  test(
+    'own controller never uses fallback identity and disposed late answer cannot publish',
+    () async {
+      var calls = 0;
+      final completer = Completer<QuestionOutcome>(),
+          api = FakeSyncareApi()
+            ..onAsk = ({required patientId, required query}) {
+              calls++;
+              return completer.future;
+            };
+      final absent = QuestionController(api, null);
+      await absent.submit('query');
+      expect(calls, 0);
+      expect(absent.state.hasError, true);
+      absent.dispose();
+      final controller = QuestionController(api, 'patient-a'),
+          request = controller.submit('query');
+      await controller.submit('duplicate');
+      expect(calls, 1);
+      controller.dispose();
+      completer.complete(const QuestionRefusal(refusal));
+      await request;
+    },
+  );
+  testWidgets(
+    'long source provenance at320/text200 remains scrollable without overflow',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpWidget(
+        wrapScreen(
+          SingleChildScrollView(
+            child: QaOutcomePanel(
+              outcome: QuestionOutcome.fromJson(questionFixture(), 'patient-a'),
+              onRetry: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(QuestionSource), findsNWidgets(3));
+      expect(tester.takeException(), isNull);
     },
   );
 }

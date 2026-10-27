@@ -1,8 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/providers.dart';
@@ -13,14 +12,164 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/risk_badge.dart';
 import '../../widgets/token_dialog.dart';
+import '../../models/verified_care_plan.dart';
+import 'approved_plan_providers.dart';
+import 'home_screen.dart';
+
+class PatientPlanScreen extends ConsumerWidget {
+  const PatientPlanScreen({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(verifiedPlansProvider),
+        old = state.valueOrNull,
+        controller = ref.read(verifiedPlansProvider.notifier);
+    final content = switch (state) {
+      AsyncData(:final value) => VerifiedPlansContent(
+        page: value,
+        onRefresh: () => controller.load(),
+        onNext: () => controller.load(next: true),
+      ),
+      AsyncLoading() when old != null => VerifiedPlansContent(
+        page: old,
+        refreshing: true,
+        onRefresh: () => controller.load(),
+        onNext: () => controller.load(next: true),
+      ),
+      AsyncError(:final error) when old != null => VerifiedPlansContent(
+        page: old,
+        error: error,
+        onRefresh: () => controller.load(),
+        onNext: () => controller.load(next: true),
+      ),
+      AsyncError(:final error) => ErrorState(
+        error: error,
+        onRetry: () => ref.invalidate(verifiedPlansProvider),
+        onReauth: () => context.go('/account'),
+      ),
+      _ => const OverviewLoading(message: 'Memuat rencana terverifikasi...'),
+    };
+    return Scaffold(
+      appBar: AppBar(title: const Text('Rencana Saya')),
+      body: SafeArea(top: false, child: ContentWidth(child: content)),
+    );
+  }
+}
+
+class VerifiedPlansContent extends StatefulWidget {
+  const VerifiedPlansContent({
+    super.key,
+    required this.page,
+    required this.onRefresh,
+    required this.onNext,
+    this.refreshing = false,
+    this.error,
+  });
+  final VerifiedPlanPage page;
+  final VoidCallback onRefresh, onNext;
+  final bool refreshing;
+  final Object? error;
+  @override
+  State<VerifiedPlansContent> createState() => _VerifiedPlansContentState();
+}
+
+class _VerifiedPlansContentState extends State<VerifiedPlansContent> {
+  String? selected;
+  @override
+  Widget build(BuildContext context) {
+    final plans = widget.page.plans;
+    final index = selected == null
+            ? -1
+            : plans.indexWhere((p) => p.id == selected),
+        current = plans.isEmpty ? null : plans[index < 0 ? 0 : index];
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(16, 12, 16, 0),
+            child: DisclaimerBanner(compact: true),
+          ),
+          if (widget.refreshing)
+            Semantics(
+              liveRegion: true,
+              child: const Text('Memperbarui rencana terverifikasi...'),
+            ),
+          if (widget.error != null)
+            ErrorState(error: widget.error!, onRetry: widget.onRefresh),
+          Padding(
+            padding: const EdgeInsetsDirectional.all(16),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: widget.refreshing ? null : widget.onRefresh,
+                  child: const Text('Muat ulang rencana'),
+                ),
+                if (widget.page.nextCursor != null)
+                  OutlinedButton(
+                    onPressed: widget.refreshing ? null : widget.onNext,
+                    child: const Text('Muat rencana sebelumnya'),
+                  ),
+              ],
+            ),
+          ),
+          if (current == null)
+            const EmptyState(
+              title: 'Belum ada rencana terverifikasi',
+              message: 'Rencana akan muncul setelah disetujui perawat.',
+              icon: Icons.description_outlined,
+            )
+          else ...[
+            if (plans.length > 1)
+              Padding(
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 16),
+                child: DropdownButtonFormField<String>(
+                  initialValue: current.id,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Riwayat persetujuan',
+                  ),
+                  items: plans
+                      .map(
+                        (p) => DropdownMenuItem(
+                          value: p.id,
+                          child: Text(p.approvedLabel),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: widget.refreshing
+                      ? null
+                      : (value) => setState(() => selected = value),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 0),
+              child: Text(
+                'Persetujuan terverifikasi: ${current.approvedLabel}.',
+              ),
+            ),
+            if (!current.applicable)
+              const Padding(
+                padding: EdgeInsetsDirectional.all(16),
+                child: Text(
+                  'Rencana ini berasal dari sumber pulang sebelumnya. Hubungi perawat untuk meninjau sumber aktif.',
+                ),
+              ),
+            _PlanDetails(record: current.record, embedded: true),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 /// Patient view of the plan a nurse approved for the current patient.
 ///
-/// The server row is rendered verbatim: the tier, plan text, cadence, approval
-/// metadata, and SATUSEHAT artifacts all come from `GET /plans/:patientId`.
+/// Care instructions remain verbatim; integration artifacts stay out of the UI.
 /// A `404` renders the empty state, not an error.
-class PatientPlanScreen extends ConsumerWidget {
-  const PatientPlanScreen({super.key});
+class LegacyPatientPlanScreen extends ConsumerWidget {
+  const LegacyPatientPlanScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -39,18 +188,6 @@ class PatientPlanScreen extends ConsumerWidget {
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: DisclaimerBanner(),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'ID Pasien: $patientId',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
               ),
               Expanded(
                 child: asyncPlan.when(
@@ -114,9 +251,10 @@ class _PlanLoading extends StatelessWidget {
 }
 
 class _PlanDetails extends StatelessWidget {
-  const _PlanDetails({required this.record});
+  const _PlanDetails({required this.record, this.embedded = false});
 
   final ApprovedPlanRecord record;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -127,12 +265,12 @@ class _PlanDetails extends StatelessWidget {
         ? null
         : _isoDatePattern.firstMatch(instruction)?.group(0);
     final String? hotline = _hotline(instruction);
-    final String status = plan.status.trim();
 
     return SingleChildScrollView(
+      physics: embedded ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Align(
             alignment: Alignment.centerLeft,
@@ -151,12 +289,11 @@ class _PlanDetails extends StatelessWidget {
             title: 'Intensitas perawatan',
             child: plan.careIntensity.isEmpty
                 ? const _MissingValue()
-                : Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: <Widget>[
-                      for (final String item in plan.careIntensity)
-                        Chip(label: Text(item)),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: 12,
+                    children: [
+                      for (final item in plan.careIntensity) Text(item),
                     ],
                   ),
           ),
@@ -184,40 +321,11 @@ class _PlanDetails extends StatelessWidget {
           const SizedBox(height: 12),
           _SectionCard(
             title: 'Persetujuan',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                _LabeledRow(
-                  label: 'Disetujui pada',
-                  value: _formatApprovalDate(record.approvedAt),
-                ),
-                _LabeledRow(
-                  label: 'Catatan peninjau',
-                  value: record.reviewerNote.trim().isEmpty
-                      ? 'Tidak tersedia'
-                      : record.reviewerNote,
-                ),
-                Text(
-                  'Status: ${status.isEmpty ? 'Tidak tersedia' : status}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Persetujuan ditandai oleh keberadaan baris rencana ini, '
-                  'bukan oleh nilai status di atas.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
-                ),
-              ],
+            child: _LabeledRow(
+              label: 'Disetujui perawat (simulasi)',
+              value: _formatApprovalDate(record.approvedAt),
             ),
           ),
-          const SizedBox(height: 12),
-          _SatuseshatExpansion(plan: plan),
         ],
       ),
     );
@@ -238,7 +346,7 @@ class _SectionCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Text(
               title,
@@ -301,84 +409,6 @@ class _MissingValue extends StatelessWidget {
   }
 }
 
-class _SatuseshatExpansion extends StatelessWidget {
-  const _SatuseshatExpansion({required this.plan});
-
-  final ApprovedPlan plan;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        leading: const Icon(Icons.data_object_outlined),
-        title: const Text('Detail SATUSEHAT'),
-        subtitle: Text(
-          'FHIR-shaped output, bukan submission SATUSEHAT.',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            height: 1.4,
-          ),
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          _JsonBlock(label: 'careplan', value: plan.satuseshat['careplan']),
-          const SizedBox(height: 12),
-          _JsonBlock(
-            label: 'servicerequest',
-            value: plan.satuseshat['servicerequest'],
-          ),
-          const SizedBox(height: 12),
-          _JsonBlock(label: 'task', value: plan.satuseshat['task']),
-        ],
-      ),
-    );
-  }
-}
-
-class _JsonBlock extends StatelessWidget {
-  const _JsonBlock({required this.label, required this.value});
-
-  final String label;
-  final Object? value;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          label,
-          style: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: SelectableText(
-            _prettyJson(value),
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontFamily: 'monospace',
-              height: 1.45,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 final RegExp _isoDatePattern = RegExp(r'\d{4}-\d{2}-\d{2}');
 final RegExp _hotlinePattern = RegExp(
   r'kontak rutin\s+(.+?)\.',
@@ -413,11 +443,4 @@ String? _hotline(String? instruction) {
       ?.group(1)
       ?.trim();
   return (value == null || value.isEmpty) ? null : value;
-}
-
-String _prettyJson(Object? value) {
-  if (value == null) {
-    return 'Tidak tersedia';
-  }
-  return const JsonEncoder.withIndent('  ').convert(value);
 }

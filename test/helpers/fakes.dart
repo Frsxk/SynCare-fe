@@ -8,8 +8,109 @@ import 'package:syncare_flutter/models/discharge_result.dart';
 import 'package:syncare_flutter/models/health.dart';
 import 'package:syncare_flutter/models/plan_draft.dart';
 import 'package:syncare_flutter/models/review_job.dart';
+import 'package:syncare_flutter/models/patient.dart';
+import 'package:syncare_flutter/models/checkin_record.dart';
+import 'package:syncare_flutter/models/homecare.dart';
+import 'package:syncare_flutter/models/escalation.dart';
+import 'package:syncare_flutter/models/verified_care_plan.dart';
 
 class FakeSyncareApi implements SyncareApi {
+  Future<VerifiedPlanPage> Function(String patientId, String? cursor)?
+  onListVerifiedPlans;
+  @override
+  Future<VerifiedPlanPage> listVerifiedPlans(
+    String patientId, {
+    String? cursor,
+  }) =>
+      onListVerifiedPlans?.call(patientId, cursor) ??
+      Future.error(UnimplementedError('listVerifiedPlans'));
+  Future<EscalationPage> Function(String patientId, String? cursor)?
+  onListEscalations;
+  Future<Escalation> Function(String alertId, String? cursor)? onGetEscalation;
+  @override
+  Future<EscalationPage> listEscalations(String patientId, {String? cursor}) =>
+      onListEscalations?.call(patientId, cursor) ??
+      Future.error(UnimplementedError('listEscalations'));
+  @override
+  Future<Escalation> getEscalation(String alertId, {String? cursor}) =>
+      onGetEscalation?.call(alertId, cursor) ??
+      Future.error(UnimplementedError('getEscalation'));
+  Future<BookingPage> Function(String patientId, String? cursor)?
+  onListBookings;
+  Future<Booking> Function(String bookingId)? onGetBooking;
+  Future<Booking> Function(
+    String bookingId,
+    int expectedVersion,
+    String reason,
+    String key,
+  )?
+  onCancelBooking;
+  @override
+  Future<BookingPage> listBookings(String patientId, {String? cursor}) =>
+      onListBookings?.call(patientId, cursor) ??
+      Future.error(UnimplementedError('listBookings'));
+  @override
+  Future<Booking> getBooking(String bookingId) =>
+      onGetBooking?.call(bookingId) ??
+      Future.error(UnimplementedError('getBooking'));
+  @override
+  Future<Booking> cancelBooking({
+    required String bookingId,
+    required int expectedVersion,
+    required String reason,
+    required String requestKey,
+  }) =>
+      onCancelBooking?.call(bookingId, expectedVersion, reason, requestKey) ??
+      Future.error(UnimplementedError('cancelBooking'));
+  Future<ServicePage> Function(String? cursor)? onHomecareServices;
+  Future<Booking> Function(String patientId, BookingInput input, String key)?
+  onRequestBooking;
+  @override
+  Future<ServicePage> listHomecareServices({String? cursor}) =>
+      onHomecareServices?.call(cursor) ??
+      Future.error(UnimplementedError('homecare'));
+  @override
+  Future<Booking> requestBooking({
+    required String patientId,
+    required BookingInput input,
+    required String requestKey,
+  }) =>
+      onRequestBooking?.call(patientId, input, requestKey) ??
+      Future.error(UnimplementedError('booking'));
+  Future<CheckinRecord> Function(
+    String patientId,
+    String message,
+    String requestKey,
+  )?
+  onSubmitCheckin;
+  Future<CheckinRecord> Function(String id)? onGetCheckin;
+  Future<CheckinPage> Function(String patientId, String? cursor)?
+  onListCheckins;
+  Future<EmergencyGuidance> Function()? onGuidance;
+  @override
+  Future<CheckinRecord> submitCheckin({
+    required String patientId,
+    required String message,
+    required String requestKey,
+  }) =>
+      onSubmitCheckin?.call(patientId, message, requestKey) ??
+      Future.error(UnimplementedError('submitCheckin'));
+  @override
+  Future<CheckinRecord> getCheckin(String checkinId) =>
+      onGetCheckin?.call(checkinId) ??
+      Future.error(UnimplementedError('getCheckin'));
+  @override
+  Future<CheckinPage> listCheckins(String patientId, {String? cursor}) =>
+      onListCheckins?.call(patientId, cursor) ??
+      Future.error(UnimplementedError('listCheckins'));
+  @override
+  Future<EmergencyGuidance> getEmergencyGuidance() =>
+      onGuidance?.call() ?? Future.error(UnimplementedError('guidance'));
+  Future<PatientOverview> Function(String patientId)? onGetPatientOverview;
+  @override
+  Future<PatientOverview> getPatientOverview(String patientId) =>
+      onGetPatientOverview?.call(patientId) ??
+      Future.error(UnimplementedError('onGetPatientOverview'));
   Future<Health> Function()? onHealth;
   Future<DischargeResult> Function(String summary)? onDischarge;
   Future<CheckinResult> Function({
@@ -33,7 +134,7 @@ class FakeSyncareApi implements SyncareApi {
     String reviewerNote,
   })?
   onResumeReview;
-  Future<AskAnswer> Function({
+  Future<QuestionOutcome> Function({
     required String patientId,
     required String query,
   })?
@@ -125,7 +226,10 @@ class FakeSyncareApi implements SyncareApi {
   }
 
   @override
-  Future<AskAnswer> ask({required String patientId, required String query}) {
+  Future<QuestionOutcome> ask({
+    required String patientId,
+    required String query,
+  }) {
     final handler = onAsk;
     if (handler == null) {
       _unstubbed('onAsk');

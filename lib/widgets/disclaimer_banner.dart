@@ -5,7 +5,9 @@ import '../core/theme.dart';
 /// Compact, always-visible notice that every value in the app comes from a
 /// synthetic demo and is not medical advice.
 class DisclaimerBanner extends StatelessWidget {
-  const DisclaimerBanner({super.key});
+  const DisclaimerBanner({this.compact = false, super.key});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -42,15 +44,17 @@ class DisclaimerBanner extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Seluruh keluaran dibuat untuk demonstrasi. Keputusan '
-                    'klinis tetap di tangan tenaga kesehatan.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppTheme.onWarningContainer,
-                      height: 1.35,
+                  if (!compact) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Seluruh keluaran dibuat untuk demonstrasi. Keputusan '
+                      'klinis tetap di tangan tenaga kesehatan.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.onWarningContainer,
+                        height: 1.35,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

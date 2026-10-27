@@ -9,11 +9,45 @@ import '../models/discharge_result.dart';
 import '../models/health.dart';
 import '../models/plan_draft.dart';
 import '../models/review_job.dart';
+import '../models/patient.dart';
+import '../models/checkin_record.dart';
+import '../models/homecare.dart';
+import '../models/escalation.dart';
+import '../models/verified_care_plan.dart';
 import 'api_exception.dart';
 import 'config.dart';
 
 /// The SynCare backend surface used by the app.
 abstract class SyncareApi {
+  Future<VerifiedPlanPage> listVerifiedPlans(
+    String patientId, {
+    String? cursor,
+  });
+  Future<EscalationPage> listEscalations(String patientId, {String? cursor});
+  Future<Escalation> getEscalation(String alertId, {String? cursor});
+  Future<ServicePage> listHomecareServices({String? cursor});
+  Future<BookingPage> listBookings(String patientId, {String? cursor});
+  Future<Booking> getBooking(String bookingId);
+  Future<Booking> cancelBooking({
+    required String bookingId,
+    required int expectedVersion,
+    required String reason,
+    required String requestKey,
+  });
+  Future<Booking> requestBooking({
+    required String patientId,
+    required BookingInput input,
+    required String requestKey,
+  });
+  Future<CheckinRecord> submitCheckin({
+    required String patientId,
+    required String message,
+    required String requestKey,
+  });
+  Future<CheckinRecord> getCheckin(String checkinId);
+  Future<CheckinPage> listCheckins(String patientId, {String? cursor});
+  Future<EmergencyGuidance> getEmergencyGuidance();
+  Future<PatientOverview> getPatientOverview(String patientId);
   Future<Health> health();
   Future<DischargeResult> discharge(String summary);
   Future<CheckinResult> checkin({
@@ -34,13 +68,31 @@ abstract class SyncareApi {
     required String actor,
     String reviewerNote = '',
   });
-  Future<AskAnswer> ask({required String patientId, required String query});
+  Future<QuestionOutcome> ask({
+    required String patientId,
+    required String query,
+  });
   Future<PlansResponse> listPlans();
   Future<ApprovedPlanRecord> getPlan(String patientId);
 }
 
 /// Dio-backed implementation of [SyncareApi].
 class ApiClient implements SyncareApi {
+  @override
+  Future<VerifiedPlanPage> listVerifiedPlans(
+    String patientId, {
+    String? cursor,
+  }) => _guard(() async {
+    final response = await _dio.get<Object?>(
+      '/api/v1/patients/${Uri.encodeComponent(patientId)}/care-plans',
+      queryParameters: {'limit': 20, 'cursor': ?cursor},
+    );
+    final page = VerifiedPlanPage.fromJson(_decodeData(response.data));
+    if (page.plans.any((p) => p.record.patientId != patientId)) {
+      throw const InvalidResponseException();
+    }
+    return page;
+  });
   ApiClient({required String baseUrl, required this._tokenSource, Dio? dio})
     : _dio = dio ?? Dio() {
     _dio.options
@@ -56,6 +108,177 @@ class ApiClient implements SyncareApi {
 
   final TokenSource _tokenSource;
   final Dio _dio;
+
+  @override
+  Future<EscalationPage> listEscalations(String patientId, {String? cursor}) =>
+      _guard(() async {
+        final response = await _dio.get<Object?>(
+          '/api/v1/patients/${Uri.encodeComponent(patientId)}/alerts',
+          queryParameters: {'limit': 20, 'cursor': ?cursor},
+        );
+        final page = EscalationPage.fromJson(_decodeData(response.data));
+        if (page.alerts.any((a) => a.patientId != patientId)) {
+          throw const InvalidResponseException();
+        }
+        return page;
+      });
+  @override
+  Future<Escalation> getEscalation(String alertId, {String? cursor}) =>
+      _guard(() async {
+        final response = await _dio.get<Object?>(
+          '/api/v1/alerts/${Uri.encodeComponent(alertId)}',
+          queryParameters: {'limit': 20, 'cursor': ?cursor},
+        );
+        final alert = Escalation.fromJson(
+          _requireMap(_decodeData(response.data))['data'],
+          detail: true,
+        );
+        if (alert.id != alertId) throw const InvalidResponseException();
+        return alert;
+      });
+  @override
+  Future<BookingPage> listBookings(String patientId, {String? cursor}) =>
+      _guard(() async {
+        final response = await _dio.get<Object?>(
+          '/api/v1/patients/${Uri.encodeComponent(patientId)}/bookings',
+          queryParameters: {'limit': 20, 'cursor': ?cursor},
+        );
+        final page = BookingPage.fromJson(_decodeData(response.data));
+        if (page.bookings.any((b) => b.patientId != patientId)) {
+          throw const InvalidResponseException();
+        }
+        return page;
+      });
+  @override
+  Future<Booking> getBooking(String bookingId) => _guard(() async {
+    final response = await _dio.get<Object?>(
+      '/api/v1/bookings/${Uri.encodeComponent(bookingId)}',
+    );
+    final booking = Booking.fromJson(
+      _requireMap(_decodeData(response.data))['data'],
+    );
+    if (booking.id != bookingId) {
+      throw const InvalidResponseException();
+    }
+    return booking;
+  });
+  @override
+  Future<Booking> cancelBooking({
+    required String bookingId,
+    required int expectedVersion,
+    required String reason,
+    required String requestKey,
+  }) => _guard(() async {
+    final response = await _dio.post<Object?>(
+      '/api/v1/bookings/${Uri.encodeComponent(bookingId)}/transitions',
+      data: {
+        'expectedVersion': expectedVersion,
+        'toStatus': 'Cancelled',
+        'reason': reason,
+      },
+      options: Options(headers: {'Idempotency-Key': requestKey}),
+    );
+    final booking = Booking.fromJson(
+      _requireMap(_requireMap(_decodeData(response.data))['data'])['resource'],
+    );
+    if (booking.id != bookingId || booking.status != BookingStatus.cancelled) {
+      throw const InvalidResponseException();
+    }
+    return booking;
+  });
+
+  @override
+  Future<ServicePage> listHomecareServices({String? cursor}) =>
+      _guard(() async {
+        final response = await _dio.get<Object?>(
+          '/api/v1/homecare/services',
+          queryParameters: {'limit': 20, 'cursor': ?cursor},
+        );
+        return ServicePage.fromJson(_decodeData(response.data));
+      });
+  @override
+  Future<Booking> requestBooking({
+    required String patientId,
+    required BookingInput input,
+    required String requestKey,
+  }) => _guard(() async {
+    final response = await _dio.post<Object?>(
+      '/api/v1/patients/${Uri.encodeComponent(patientId)}/bookings',
+      data: input.toJson(),
+      options: Options(headers: {'Idempotency-Key': requestKey}),
+    );
+    final booking = Booking.fromJson(
+      _requireMap(_requireMap(_decodeData(response.data))['data'])['resource'],
+    );
+    if (booking.patientId != patientId ||
+        booking.service.id != input.serviceId) {
+      throw const InvalidResponseException();
+    }
+    return booking;
+  });
+
+  @override
+  Future<CheckinRecord> submitCheckin({
+    required String patientId,
+    required String message,
+    required String requestKey,
+  }) => _guard(() async {
+    final response = await _dio.post<Object?>(
+      '/api/v1/patients/${Uri.encodeComponent(patientId)}/checkins',
+      data: {'message': message},
+      options: Options(headers: {'Idempotency-Key': requestKey}),
+    );
+    final record = CheckinRecord.fromJson(
+      _requireMap(_requireMap(_decodeData(response.data))['data'])['resource'],
+    );
+    if (record.patientId != patientId) throw const InvalidResponseException();
+    return record;
+  });
+  @override
+  Future<CheckinRecord> getCheckin(String checkinId) => _guard(() async {
+    final response = await _dio.get<Object?>(
+      '/api/v1/checkins/${Uri.encodeComponent(checkinId)}',
+    );
+    final record = CheckinRecord.fromJson(
+      _requireMap(_decodeData(response.data))['data'],
+    );
+    if (record.id != checkinId) throw const InvalidResponseException();
+    return record;
+  });
+  @override
+  Future<CheckinPage> listCheckins(String patientId, {String? cursor}) =>
+      _guard(() async {
+        final response = await _dio.get<Object?>(
+          '/api/v1/patients/${Uri.encodeComponent(patientId)}/checkins',
+          queryParameters: {'limit': 20, 'cursor': ?cursor},
+        );
+        final page = CheckinPage.fromJson(_decodeData(response.data));
+        if (page.records.any((r) => r.patientId != patientId)) {
+          throw const InvalidResponseException();
+        }
+        return page;
+      });
+  @override
+  Future<EmergencyGuidance> getEmergencyGuidance() => _guard(() async {
+    final response = await _dio.get<Object?>('/api/v1/emergency-guidance');
+    return EmergencyGuidance.fromJson(
+      _requireMap(_decodeData(response.data))['data'],
+    );
+  });
+
+  @override
+  Future<PatientOverview> getPatientOverview(String patientId) =>
+      _guard(() async {
+        final response = await _dio.get<Object?>(
+          '/api/v1/patients/${Uri.encodeComponent(patientId)}/overview',
+        );
+        final envelope = _requireMap(_decodeData(response.data));
+        final overview = PatientOverview.fromJson(envelope['data']);
+        if (overview.profile.id != patientId) {
+          throw const InvalidResponseException();
+        }
+        return overview;
+      });
 
   void _interceptRequest(
     RequestOptions options,
@@ -181,21 +404,19 @@ class ApiClient implements SyncareApi {
   }
 
   @override
-  Future<AskAnswer> ask({required String patientId, required String query}) {
+  Future<QuestionOutcome> ask({
+    required String patientId,
+    required String query,
+  }) {
     return _guard(() async {
-      final output = await _postFlow('/api/v1/answers', <String, dynamic>{
-        'patient_id': patientId,
-        'query': query,
-      });
-      final text = output is String
-          ? output
-          : output == null
-          ? ''
-          : jsonEncode(output);
-      if (text.trim().isEmpty) {
-        throw const InvalidResponseException();
-      }
-      return AskAnswer.fromText(text);
+      final response = await _dio.post<Object?>(
+        '/api/v1/patients/${Uri.encodeComponent(patientId)}/questions',
+        data: {'query': query},
+      );
+      return QuestionOutcome.fromJson(
+        _requireMap(_decodeData(response.data))['data'],
+        patientId,
+      );
     });
   }
 

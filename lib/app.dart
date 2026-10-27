@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/theme.dart';
-import 'features/auth/role_picker_screen.dart';
+import 'features/auth/login_screen.dart';
+import 'features/auth/session_controller.dart';
+import 'models/session.dart';
 import 'features/nurse/approval_desk_screen.dart';
 import 'features/nurse/draft_screen.dart';
 import 'features/nurse/intake_screen.dart';
@@ -11,27 +14,110 @@ import 'features/nurse/patients_screen.dart';
 import 'features/patient/ask_screen.dart';
 import 'features/patient/checkin_screen.dart';
 import 'features/patient/plan_screen.dart';
+import 'features/patient/home_screen.dart';
+import 'features/patient/profile_screen.dart';
+import 'features/patient/checkin_history_screen.dart';
+import 'features/patient/checkin_detail_screen.dart';
+import 'features/patient/homecare_screen.dart';
+import 'features/patient/booking_request_screen.dart';
+import 'features/patient/booking_history_screen.dart';
+import 'features/patient/booking_detail_screen.dart';
+import 'features/patient/alert_detail_screen.dart';
 import 'widgets/app_shell.dart';
 
-/// Application router: the role picker stands alone, every role screen renders
-/// inside the shared [AppShell] navigation bar.
+/// Protected routes follow the backend-validated identity, including deep links.
 final routerProvider = Provider<GoRouter>((ref) {
+  final refresh = ValueNotifier<int>(0);
+  ref.listen(sessionControllerProvider, (_, _) => refresh.value++);
   final router = GoRouter(
     initialLocation: '/',
+    refreshListenable: refresh,
+    redirect: (context, route) {
+      final session = ref.read(sessionControllerProvider);
+      final path = route.uri.path;
+      if (session is! SessionAuthenticated) {
+        return path == '/' ? null : '/';
+      }
+      if (path == '/') {
+        return '/account';
+      }
+      if (path.startsWith('/nurse/') &&
+              session.session.principal.role != 'nurse' ||
+          path.startsWith('/patient/') &&
+              session.session.principal.role != 'patient') {
+        return '/account';
+      }
+      return null;
+    },
     routes: <RouteBase>[
       GoRoute(
         path: '/',
         builder: (BuildContext context, GoRouterState state) =>
-            const RolePickerScreen(),
+            const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/account',
+        builder: (_, _) => const SessionAccountScreen(),
       ),
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) =>
-            AppShell(location: state.uri.path, child: child),
+            AppShell(
+              key: ValueKey(ref.read(sessionControllerProvider).generation),
+              location: state.uri.path,
+              child: child,
+            ),
         routes: <RouteBase>[
+          GoRoute(
+            path: '/patient/home',
+            builder: (_, _) => const PatientHomeScreen(),
+          ),
+          GoRoute(
+            path: '/patient/alerts',
+            builder: (_, _) => const AlertHistoryScreen(),
+          ),
+          GoRoute(
+            path: '/patient/alerts/:alertId',
+            builder: (_, state) =>
+                AlertDetailScreen(alertId: state.pathParameters['alertId']!),
+          ),
+          GoRoute(
+            path: '/patient/profile',
+            builder: (_, _) => const PatientProfileScreen(),
+          ),
+          GoRoute(
+            path: '/patient/homecare',
+            builder: (_, _) => const HomecareScreen(),
+          ),
+          GoRoute(
+            path: '/patient/homecare/:serviceId/request',
+            builder: (_, state) => BookingRequestScreen(
+              serviceId: state.pathParameters['serviceId']!,
+            ),
+          ),
           GoRoute(
             path: '/patient/checkin',
             builder: (BuildContext context, GoRouterState state) =>
                 const PatientCheckinScreen(),
+          ),
+          GoRoute(
+            path: '/patient/checkins',
+            builder: (_, _) => const CheckinHistoryScreen(),
+          ),
+          GoRoute(
+            path: '/patient/checkins/:checkinId',
+            builder: (_, state) => CheckinDetailScreen(
+              checkinId: state.pathParameters['checkinId']!,
+            ),
+          ),
+          GoRoute(
+            path: '/patient/bookings',
+            builder: (_, _) => const BookingHistoryScreen(),
+          ),
+          GoRoute(
+            path: '/patient/bookings/:bookingId',
+            builder: (_, state) => BookingDetailScreen(
+              bookingId: state.pathParameters['bookingId']!,
+            ),
           ),
           GoRoute(
             path: '/patient/plan',
@@ -67,7 +153,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
-  ref.onDispose(router.dispose);
+  ref.onDispose(() {
+    router.dispose();
+    refresh.dispose();
+  });
   return router;
 });
 
@@ -78,6 +167,9 @@ class SynCareApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'SynCare',
+      locale: const Locale('id'),
+      supportedLocales: const [Locale('id')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: AppTheme.light(),
       routerConfig: ref.watch(routerProvider),
       debugShowCheckedModeBanner: false,

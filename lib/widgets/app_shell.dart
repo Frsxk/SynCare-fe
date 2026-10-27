@@ -17,9 +17,9 @@ class AppShell extends StatelessWidget {
   static const List<_ShellDestination> _patientDestinations =
       <_ShellDestination>[
         _ShellDestination(
-          label: 'Check-in',
-          path: '/patient/checkin',
-          icon: Icons.monitor_heart_outlined,
+          label: 'Ringkasan',
+          path: '/patient/home',
+          icon: Icons.home_outlined,
         ),
         _ShellDestination(
           label: 'Rencana',
@@ -32,8 +32,8 @@ class AppShell extends StatelessWidget {
           icon: Icons.question_answer_outlined,
         ),
         _ShellDestination(
-          label: 'Peran',
-          path: '/',
+          label: 'Akun',
+          path: '/account',
           icon: Icons.switch_account_outlined,
         ),
       ];
@@ -60,8 +60,8 @@ class AppShell extends StatelessWidget {
       icon: Icons.groups_outlined,
     ),
     _ShellDestination(
-      label: 'Peran',
-      path: '/',
+      label: 'Akun',
+      path: '/account',
       icon: Icons.switch_account_outlined,
     ),
   ];

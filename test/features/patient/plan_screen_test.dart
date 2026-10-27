@@ -59,64 +59,48 @@ void main() {
     final FakeSyncareApi fake = FakeSyncareApi()..onGetPlan = onGetPlan;
     await tester.pumpWidget(
       wrapScreen(
-        const PatientPlanScreen(),
+        const LegacyPatientPlanScreen(),
         overrides: <Override>[apiProvider.overrideWithValue(fake)],
       ),
     );
     return fake;
   }
 
-  testWidgets('renders the approved plan, tier, and SATUSEHAT detail', (
-    tester,
-  ) async {
-    await pumpScreen(tester, onGetPlan: (_) async => _record());
-    await tester.pumpAndSettle();
+  testWidgets(
+    'renders care instructions without backend artifacts or private notes',
+    (tester) async {
+      await pumpScreen(tester, onGetPlan: (_) async => _record());
+      await tester.pumpAndSettle();
 
-    expect(find.text('Rencana Saya'), findsOneWidget);
-    expect(find.byType(DisclaimerBanner), findsOneWidget);
-    expect(find.text('ID Pasien: demo-1'), findsOneWidget);
-    expect(find.text('Pemantauan ketat selama 7 hari.'), findsOneWidget);
-    expect(find.byType(RiskBadge), findsOneWidget);
-    expect(find.text('HIGH'), findsOneWidget);
+      expect(find.text('Rencana Saya'), findsOneWidget);
+      expect(find.byType(DisclaimerBanner), findsOneWidget);
+      expect(find.text('ID Pasien: demo-1'), findsNothing);
+      expect(find.text('Pemantauan ketat selama 7 hari.'), findsOneWidget);
+      expect(find.byType(RiskBadge), findsOneWidget);
+      expect(find.text('HIGH'), findsOneWidget);
 
-    expect(find.text('Intensitas perawatan'), findsOneWidget);
-    expect(find.text('Telepon 48 jam'), findsOneWidget);
-    expect(find.text('Kunjungan 7 hari'), findsOneWidget);
+      expect(find.text('Intensitas perawatan'), findsOneWidget);
+      expect(find.text('Telepon 48 jam'), findsOneWidget);
+      expect(find.text('Kunjungan 7 hari'), findsOneWidget);
 
-    expect(find.text('09/10/2026 16:49'), findsOneWidget);
-    expect(find.text('Disetujui.'), findsOneWidget);
-    expect(find.text('Status: DRAFT pending human approval'), findsOneWidget);
-    expect(
-      find.textContaining('bukan oleh nilai status di atas'),
-      findsOneWidget,
-    );
+      expect(find.text('09/10/2026 16:49'), findsOneWidget);
+      expect(find.text('Disetujui.'), findsNothing);
+      expect(find.text('Disetujui perawat (simulasi)'), findsOneWidget);
+      expect(find.text('Status: DRAFT pending human approval'), findsNothing);
 
-    final double bannerTop = tester
-        .getTopLeft(find.byType(DisclaimerBanner))
-        .dy;
-    final double planTop = tester
-        .getTopLeft(find.text('Pemantauan ketat selama 7 hari.'))
-        .dy;
-    expect(bannerTop, lessThan(planTop));
+      final double bannerTop = tester
+          .getTopLeft(find.byType(DisclaimerBanner))
+          .dy;
+      final double planTop = tester
+          .getTopLeft(find.text('Pemantauan ketat selama 7 hari.'))
+          .dy;
+      expect(bannerTop, lessThan(planTop));
 
-    expect(
-      find.text('FHIR-shaped output, bukan submission SATUSEHAT.'),
-      findsOneWidget,
-    );
-
-    await tester.ensureVisible(find.text('Detail SATUSEHAT'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Detail SATUSEHAT'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('"resourceType": "CarePlan"'), findsOneWidget);
-    expect(
-      find.textContaining('"resourceType": "ServiceRequest"'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('"patientInstruction"'), findsOneWidget);
-    expect(find.textContaining('"resourceType": "Task"'), findsOneWidget);
-  });
+      expect(find.text('Detail SATUSEHAT'), findsNothing);
+      expect(find.textContaining('"resourceType"'), findsNothing);
+      expect(find.text('Catatan peninjau'), findsNothing);
+    },
+  );
 
   testWidgets('shows the follow-up date and hotline from the instruction', (
     tester,

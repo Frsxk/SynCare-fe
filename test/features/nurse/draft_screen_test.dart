@@ -81,7 +81,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(DatePickerDialog), findsOneWidget);
-    await tester.tap(find.text('OK'));
+    final labels = MaterialLocalizations.of(
+      tester.element(find.byType(DatePickerDialog)),
+    );
+    await tester.tap(find.text(labels.okButtonLabel));
     await tester.pumpAndSettle();
   }
 

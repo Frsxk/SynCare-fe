@@ -25,6 +25,11 @@ abstract class SyncareApi {
   });
   Future<EscalationPage> listEscalations(String patientId, {String? cursor});
   Future<Escalation> getEscalation(String alertId, {String? cursor});
+  Future<EmergencyRequestResult> requestEmergency({
+    required String patientId,
+    required String reason,
+    required String requestKey,
+  });
   Future<ServicePage> listHomecareServices({String? cursor});
   Future<BookingPage> listBookings(String patientId, {String? cursor});
   Future<Booking> getBooking(String bookingId);
@@ -136,6 +141,20 @@ class ApiClient implements SyncareApi {
         if (alert.id != alertId) throw const InvalidResponseException();
         return alert;
       });
+  @override
+  Future<EmergencyRequestResult> requestEmergency({
+    required String patientId,
+    required String reason,
+    required String requestKey,
+  }) => _guard(() async {
+    final response = await _dio.post<Object?>(
+      '/api/v1/patients/${Uri.encodeComponent(patientId)}/emergencies',
+      data: {'reason': reason},
+      options: Options(headers: {'Idempotency-Key': requestKey}),
+    );
+    final data = _requireMap(_decodeData(response.data))['data'];
+    return EmergencyRequestResult.fromJson(data, patientId: patientId);
+  });
   @override
   Future<BookingPage> listBookings(String patientId, {String? cursor}) =>
       _guard(() async {

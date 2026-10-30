@@ -27,6 +27,12 @@ class FakeSyncareApi implements SyncareApi {
   Future<EscalationPage> Function(String patientId, String? cursor)?
   onListEscalations;
   Future<Escalation> Function(String alertId, String? cursor)? onGetEscalation;
+  Future<EmergencyRequestResult> Function(
+    String patientId,
+    String reason,
+    String key,
+  )?
+  onRequestEmergency;
   @override
   Future<EscalationPage> listEscalations(String patientId, {String? cursor}) =>
       onListEscalations?.call(patientId, cursor) ??
@@ -35,6 +41,14 @@ class FakeSyncareApi implements SyncareApi {
   Future<Escalation> getEscalation(String alertId, {String? cursor}) =>
       onGetEscalation?.call(alertId, cursor) ??
       Future.error(UnimplementedError('getEscalation'));
+  @override
+  Future<EmergencyRequestResult> requestEmergency({
+    required String patientId,
+    required String reason,
+    required String requestKey,
+  }) =>
+      onRequestEmergency?.call(patientId, reason, requestKey) ??
+      Future.error(UnimplementedError('requestEmergency'));
   Future<BookingPage> Function(String patientId, String? cursor)?
   onListBookings;
   Future<Booking> Function(String bookingId)? onGetBooking;

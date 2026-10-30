@@ -9,6 +9,7 @@ import 'alert_providers.dart';
 import 'home_screen.dart';
 import 'checkin_providers.dart';
 import 'emergency_notice.dart';
+import 'emergency_request.dart';
 
 class AlertHistoryScreen extends ConsumerWidget {
   const AlertHistoryScreen({super.key});
@@ -20,27 +21,44 @@ class AlertHistoryScreen extends ConsumerWidget {
     final content = switch (state) {
       AsyncData(:final value) => AlertHistoryList(
         page: value,
+        header: const EmergencyRequestPanel(),
         onRefresh: () => notifier.load(),
         onNext: () => notifier.load(next: true),
       ),
       AsyncLoading() when old != null => AlertHistoryList(
         page: old,
+        header: const EmergencyRequestPanel(),
         refreshing: true,
         onRefresh: () => notifier.load(),
         onNext: () => notifier.load(next: true),
       ),
       AsyncError(:final error) when old != null => AlertHistoryList(
         page: old,
+        header: const EmergencyRequestPanel(),
         error: error,
         onRefresh: () => notifier.load(),
         onNext: () => notifier.load(next: true),
       ),
-      AsyncError(:final error) => ErrorState(
-        error: error,
-        onRetry: () => ref.invalidate(alertHistoryProvider),
-        onReauth: () => context.go('/account'),
+      AsyncError(:final error) => ListView(
+        padding: const EdgeInsetsDirectional.all(24),
+        children: [
+          const EmergencyRequestPanel(),
+          const SizedBox(height: 16),
+          ErrorState(
+            error: error,
+            onRetry: () => ref.invalidate(alertHistoryProvider),
+            onReauth: () => context.go('/account'),
+          ),
+        ],
       ),
-      _ => const OverviewLoading(message: 'Memuat status tindak lanjut...'),
+      _ => ListView(
+        padding: const EdgeInsetsDirectional.all(24),
+        children: const [
+          EmergencyRequestPanel(),
+          SizedBox(height: 16),
+          OverviewLoading(message: 'Memuat status tindak lanjut...'),
+        ],
+      ),
     };
     return Scaffold(
       appBar: AppBar(title: const Text('Tindak lanjut saya')),
@@ -54,12 +72,14 @@ class AlertHistoryList extends StatelessWidget {
     required this.page,
     required this.onRefresh,
     required this.onNext,
+    this.header,
     this.refreshing = false,
     this.error,
     super.key,
   });
   final EscalationPage page;
   final VoidCallback onRefresh, onNext;
+  final Widget? header;
   final bool refreshing;
   final Object? error;
   @override
@@ -71,6 +91,7 @@ class AlertHistoryList extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (header != null) ...[header!, const SizedBox(height: 16)],
             const DisclaimerBanner(compact: true),
             const SizedBox(height: 16),
             const Text(
@@ -117,7 +138,11 @@ class AlertHistoryList extends StatelessWidget {
               'Status: ${alert.status.label}',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            Text('Laporan: ${alert.reportedLabel}'),
+            Text(
+              alert.isPatientRequest
+                  ? 'Permintaan darurat: ${alert.reportedLabel}'
+                  : 'Laporan: ${alert.reportedLabel}',
+            ),
             Text(alert.reason),
             const SizedBox(height: 16),
             OutlinedButton(
@@ -201,7 +226,11 @@ class AlertDetailContent extends StatelessWidget {
         'Status: ${alert.status.label}',
         style: Theme.of(context).textTheme.headlineSmall,
       ),
-      Text('Laporan: ${alert.reportedLabel}'),
+      Text(
+        alert.isPatientRequest
+            ? 'Permintaan darurat: ${alert.reportedLabel}'
+            : 'Laporan: ${alert.reportedLabel}',
+      ),
       const SizedBox(height: 16),
       Text(alert.reason),
       if (alert.acknowledgedLabel case final String label)

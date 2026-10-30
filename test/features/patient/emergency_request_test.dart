@@ -8,10 +8,10 @@ import 'package:syncare_flutter/features/patient/alert_providers.dart';
 import 'package:syncare_flutter/features/patient/checkin_providers.dart';
 import 'package:syncare_flutter/features/patient/emergency_request.dart';
 import 'package:syncare_flutter/models/escalation.dart';
-import '../helpers/checkin_fixture.dart';
-import '../helpers/escalation_fixture.dart';
-import '../helpers/fakes.dart';
-import '../helpers/pump_app.dart';
+import '../../helpers/checkin_fixture.dart';
+import '../../helpers/escalation_fixture.dart';
+import '../../helpers/fakes.dart';
+import '../../helpers/pump_app.dart';
 
 final _uuidV4 = RegExp(
   r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',

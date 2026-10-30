@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +16,7 @@ import '../../widgets/token_dialog.dart';
 import '../../models/verified_care_plan.dart';
 import 'approved_plan_providers.dart';
 import 'home_screen.dart';
+import 'plan_items.dart';
 
 class PatientPlanScreen extends ConsumerWidget {
   const PatientPlanScreen({super.key});
@@ -280,23 +282,20 @@ class _PlanDetails extends StatelessWidget {
           const SizedBox(height: 12),
           _SectionCard(
             title: 'Rencana tindak lanjut',
-            child: Text(
-              plan.planText.trim().isEmpty ? 'Tidak tersedia' : plan.planText,
+            child: _PlanItemList(
+              items: planTextItems(plan.planText),
+              semanticsLabel: 'Langkah rencana tindak lanjut',
               style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
             ),
           ),
           const SizedBox(height: 12),
           _SectionCard(
             title: 'Intensitas perawatan',
-            child: plan.careIntensity.isEmpty
-                ? const _MissingValue()
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    spacing: 12,
-                    children: [
-                      for (final item in plan.careIntensity) Text(item),
-                    ],
-                  ),
+            child: _PlanItemList(
+              items: planStructuredItems(plan),
+              semanticsLabel: 'Butir intensitas perawatan',
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+            ),
           ),
           const SizedBox(height: 12),
           _SectionCard(
@@ -388,6 +387,62 @@ class _LabeledRow extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(value, style: theme.textTheme.bodyMedium?.copyWith(height: 1.4)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlanItemList extends StatelessWidget {
+  const _PlanItemList({
+    required this.items,
+    required this.semanticsLabel,
+    this.style,
+  });
+
+  final List<String> items;
+  final String semanticsLabel;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const _MissingValue();
+    }
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: semanticsLabel,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (int index = 0; index < items.length; index++)
+            Semantics(
+              container: true,
+              label: items[index],
+              sortKey: OrdinalSortKey(index.toDouble()),
+              child: ExcludeSemantics(
+                child: Padding(
+                  padding: EdgeInsetsDirectional.only(
+                    bottom: index == items.length - 1 ? 0 : 8,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      SizedBox(
+                        width: 16,
+                        child: Text(
+                          '•',
+                          style: style?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(items[index], style: style)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

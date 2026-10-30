@@ -92,13 +92,13 @@ class OverviewContent extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton.icon(
               icon: const Icon(Icons.edit_note),
-              onPressed: () => context.go('/patient/checkin'),
+              onPressed: () => context.push('/patient/checkin'),
               label: const Text('Tulis check-in'),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
               icon: const Icon(Icons.person_outline),
-              onPressed: () => context.go('/patient/profile'),
+              onPressed: () => context.push('/patient/profile'),
               label: const Text('Lihat profil saya'),
             ),
           ],
@@ -136,7 +136,7 @@ class OverviewContent extends StatelessWidget {
             const SizedBox(height: 16),
             TextButton.icon(
               icon: const Icon(Icons.history),
-              onPressed: () => context.go('/patient/checkins'),
+              onPressed: () => context.push('/patient/checkins'),
               label: const Text('Buka riwayat laporan'),
             ),
           ],
@@ -147,14 +147,14 @@ class OverviewContent extends StatelessWidget {
         icon: Icons.home_work_outlined,
         title: 'Ajukan homecare',
         description: 'Kunjungan perawat dalam simulasi demo.',
-        onTap: () => context.go('/patient/homecare'),
+        onTap: () => context.push('/patient/homecare'),
       ),
       const SizedBox(height: 12),
       CareAction(
         icon: Icons.support_agent,
         title: 'Buka status tindak lanjut',
         description: 'Lihat perkembangan laporan yang dieskalasi.',
-        onTap: () => context.go('/patient/alerts'),
+        onTap: () => context.push('/patient/alerts'),
       ),
     ],
   );

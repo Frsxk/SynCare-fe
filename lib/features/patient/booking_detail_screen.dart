@@ -66,7 +66,13 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                 content,
                 const SizedBox(height: 16),
                 OutlinedButton(
-                  onPressed: () => context.go('/patient/bookings'),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/patient/bookings');
+                    }
+                  },
                   child: const Text('Kembali ke booking saya'),
                 ),
               ],

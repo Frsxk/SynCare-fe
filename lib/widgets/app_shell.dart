@@ -80,8 +80,15 @@ class AppShell extends StatelessWidget {
       body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
-        onDestinationSelected: (int index) =>
-            context.go(destinations[index].path),
+        onDestinationSelected: (int index) {
+          final destination = destinations[index].path;
+          if (destination == GoRouter.of(context).state.uri.path) return;
+          if (destination == '/patient/home' || destination == '/nurse/intake') {
+            context.go(destination);
+          } else {
+            context.push(destination);
+          }
+        },
         destinations: <Widget>[
           for (final _ShellDestination destination in destinations)
             NavigationDestination(

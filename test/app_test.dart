@@ -8,6 +8,13 @@ import 'package:syncare_flutter/features/auth/session_controller.dart';
 import 'package:syncare_flutter/models/session.dart';
 import 'package:syncare_flutter/widgets/disclaimer_banner.dart';
 import 'package:syncare_flutter/features/nurse/draft_screen.dart';
+import 'package:syncare_flutter/features/nurse/intake_screen.dart';
+import 'package:syncare_flutter/features/patient/alert_detail_screen.dart';
+import 'package:syncare_flutter/features/patient/ask_screen.dart';
+import 'package:syncare_flutter/features/patient/checkin_detail_screen.dart';
+import 'package:syncare_flutter/features/patient/checkin_history_screen.dart';
+import 'package:syncare_flutter/features/patient/home_screen.dart';
+import 'package:syncare_flutter/features/patient/plan_screen.dart';
 
 import 'features/auth/session_controller_test.dart' show FakeSessionApi, grant;
 import 'helpers/fakes.dart';
@@ -21,6 +28,9 @@ import 'helpers/homecare_fixture.dart';
 import 'helpers/booking_lifecycle_fixture.dart';
 import 'helpers/escalation_fixture.dart';
 import 'package:syncare_flutter/models/escalation.dart';
+import 'package:syncare_flutter/models/discharge_result.dart';
+import 'package:syncare_flutter/models/verified_care_plan.dart';
+import 'helpers/verified_plan_fixture.dart';
 
 void main() {
   testWidgets(
@@ -115,7 +125,7 @@ void main() {
       await tester.tap(open);
       await tester.pumpAndSettle();
       expect(
-        scope.read(routerProvider).routeInformationProvider.value.uri.path,
+        scope.read(routerProvider).state.uri.path,
         '/patient/alerts/alert-a',
       );
       expect(find.text('Status: Ditutup'), findsOneWidget);
@@ -186,7 +196,7 @@ void main() {
       await tester.tap(open);
       await tester.pumpAndSettle();
       expect(
-        scope.read(routerProvider).routeInformationProvider.value.uri.path,
+        scope.read(routerProvider).state.uri.path,
         '/patient/bookings/booking-a',
       );
       final field = find.widgetWithText(TextField, 'Alasan pembatalan');
@@ -344,10 +354,7 @@ void main() {
       expect(find.text('Saya Pasien'), findsNothing);
       scope.read(routerProvider).go('/patient/plan');
       await tester.pumpAndSettle();
-      expect(
-        scope.read(routerProvider).routeInformationProvider.value.uri.path,
-        '/',
-      );
+      expect(scope.read(routerProvider).state.uri.path, '/');
       expect(find.text('Rencana Saya'), findsNothing);
     },
   );
@@ -393,10 +400,7 @@ void main() {
       );
       scope.read(routerProvider).go('/nurse/approval');
       await tester.pumpAndSettle();
-      expect(
-        scope.read(routerProvider).routeInformationProvider.value.uri.path,
-        '/account',
-      );
+      expect(scope.read(routerProvider).state.uri.path, '/account');
       await tester.tap(find.text('Keluar'));
       await tester.pumpAndSettle();
       expect(find.byType(LoginScreen), findsOneWidget);
@@ -491,6 +495,455 @@ void main() {
       expect(find.text('Profil saya'), findsOneWidget);
       expect(find.text('ID pasien: record-a'), findsNothing);
       expect(find.text('Pasien sintetis record-a'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await scope.read(sessionControllerProvider.notifier).logout();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'system Back pops patient report detail then history one level and exits at home',
+    (tester) async {
+      final api = FakeSyncareApi();
+      api.onGetPatientOverview = (id) async => overviewFixture(id: id);
+      api.onListCheckins = (id, cursor) async => CheckinPage([
+        checkinFixture(id: 'report-a', patientId: id),
+      ], null);
+      api.onGetCheckin = (id) async =>
+          checkinFixture(id: id, patientId: 'record-a');
+      final scope = ProviderContainer(
+        overrides: [
+          sessionApiProvider.overrideWithValue(
+            FakeSessionApi()..onLogin = (id, _) async => grant(id),
+          ),
+          tokenSourceProvider.overrideWithValue(FakeTokenSource()),
+          apiProvider.overrideWithValue(api),
+        ],
+      );
+      addTearDown(scope.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: scope, child: const SynCareApp()),
+      );
+      await tester.pumpAndSettle();
+      await scope
+          .read(sessionControllerProvider.notifier)
+          .login('a', 'synthetic-component-password');
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/home');
+      await tester.ensureVisible(find.text('Buka riwayat laporan'));
+      await tester.tap(find.text('Buka riwayat laporan'));
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/checkins');
+      expect(find.byType(CheckinHistoryScreen), findsOneWidget);
+      final report = find.text('Laporan 2026-10-25 07:00 WIB');
+      await tester.scrollUntilVisible(
+        report,
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(CheckinHistoryScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(report);
+      await tester.pumpAndSettle();
+      expect(
+        scope.read(routerProvider).state.uri.path,
+        '/patient/checkins/report-a',
+      );
+      expect(find.byType(CheckinDetailScreen), findsOneWidget);
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/checkins');
+      expect(find.byType(CheckinDetailScreen), findsNothing);
+      expect(find.byType(CheckinHistoryScreen), findsOneWidget);
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/home');
+      expect(find.byType(PatientHomeScreen), findsOneWidget);
+      expect(find.byType(CheckinHistoryScreen), findsNothing);
+      expect(await tester.binding.handlePopRoute(), isFalse);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/home');
+      expect(find.byType(PatientHomeScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await scope.read(sessionControllerProvider.notifier).logout();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'system Back at anonymous login is unhandled and keeps login visible',
+    (tester) async {
+      final scope = ProviderContainer(
+        overrides: [
+          sessionApiProvider.overrideWithValue(FakeSessionApi()),
+          tokenSourceProvider.overrideWithValue(FakeTokenSource()),
+        ],
+      );
+      addTearDown(scope.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: scope, child: const SynCareApp()),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(scope.read(routerProvider).state.uri.path, '/');
+      expect(await tester.binding.handlePopRoute(), isFalse);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/');
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'shell tabs and account preserve the prior page, ignore repeated taps, and reset at home',
+    (tester) async {
+      final api = FakeSyncareApi();
+      api.onGetPatientOverview = (id) async => overviewFixture(id: id);
+      api.onListVerifiedPlans = (id, cursor) async =>
+          VerifiedPlanPage([verifiedPlanFixture(patientId: id)], null);
+      final scope = ProviderContainer(
+        overrides: [
+          sessionApiProvider.overrideWithValue(
+            FakeSessionApi()..onLogin = (id, _) async => grant(id),
+          ),
+          tokenSourceProvider.overrideWithValue(FakeTokenSource()),
+          apiProvider.overrideWithValue(api),
+        ],
+      );
+      addTearDown(scope.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: scope, child: const SynCareApp()),
+      );
+      await tester.pumpAndSettle();
+      await scope
+          .read(sessionControllerProvider.notifier)
+          .login('a', 'synthetic-component-password');
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/home');
+
+      final tanyaTab = find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Tanya'),
+      );
+      await tester.tap(tanyaTab);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/ask');
+      expect(find.byType(PatientAskScreen), findsOneWidget);
+      await tester.tap(tanyaTab);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/ask');
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/home');
+      expect(find.byType(PatientHomeScreen), findsOneWidget);
+
+      final rencanaTab = find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Rencana'),
+      );
+      await tester.tap(rencanaTab);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/plan');
+      expect(find.byType(PatientPlanScreen), findsOneWidget);
+      await tester.tap(rencanaTab);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/plan');
+
+      final akunTab = find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Akun'),
+      );
+      await tester.tap(akunTab);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/account');
+      expect(find.byType(SessionAccountScreen), findsOneWidget);
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/plan');
+      expect(find.byType(PatientPlanScreen), findsOneWidget);
+      expect(find.byType(SessionAccountScreen), findsNothing);
+
+      await tester.tap(akunTab);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/account');
+      await tester.ensureVisible(find.text('Ringkasan perawatan saya'));
+      await tester.tap(find.text('Ringkasan perawatan saya'));
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/home');
+      expect(find.byType(PatientHomeScreen), findsOneWidget);
+      expect(await tester.binding.handlePopRoute(), isFalse);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/home');
+      expect(find.byType(PatientHomeScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await scope.read(sessionControllerProvider.notifier).logout();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'direct secondary deep link without history falls back to patient home on system Back',
+    (tester) async {
+      final api = FakeSyncareApi();
+      api.onGetPatientOverview = (id) async => overviewFixture(id: id);
+      api.onGetCheckin = (id) async =>
+          checkinFixture(id: id, patientId: 'record-a');
+      final scope = ProviderContainer(
+        overrides: [
+          sessionApiProvider.overrideWithValue(
+            FakeSessionApi()..onLogin = (id, _) async => grant(id),
+          ),
+          tokenSourceProvider.overrideWithValue(FakeTokenSource()),
+          apiProvider.overrideWithValue(api),
+        ],
+      );
+      addTearDown(scope.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: scope, child: const SynCareApp()),
+      );
+      await tester.pumpAndSettle();
+      await scope
+          .read(sessionControllerProvider.notifier)
+          .login('a', 'synthetic-component-password');
+      await tester.pumpAndSettle();
+      scope.read(routerProvider).go('/patient/checkins/report-a');
+      await tester.pumpAndSettle();
+      expect(
+        scope.read(routerProvider).state.uri.path,
+        '/patient/checkins/report-a',
+      );
+      expect(find.byType(CheckinDetailScreen), findsOneWidget);
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/home');
+      expect(find.byType(CheckinDetailScreen), findsNothing);
+      expect(find.byType(PatientHomeScreen), findsOneWidget);
+      expect(await tester.binding.handlePopRoute(), isFalse);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/home');
+      expect(tester.takeException(), isNull);
+      await scope.read(sessionControllerProvider.notifier).logout();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'nurse account without history falls back to intake and pushed workflow Back pops',
+    (tester) async {
+      final scope = ProviderContainer(
+        overrides: [
+          sessionApiProvider.overrideWithValue(
+            FakeSessionApi()
+              ..onLogin = (id, _) async => SessionGrant(
+                token: 'synthetic-nurse-token',
+                session: SessionSnapshot(
+                  principal: const SessionPrincipal(
+                    id: 'nurse-a',
+                    role: 'nurse',
+                    capabilities: [],
+                  ),
+                  expiresAt: DateTime.now().toUtc().add(
+                    const Duration(hours: 24),
+                  ),
+                ),
+              ),
+          ),
+          tokenSourceProvider.overrideWithValue(FakeTokenSource()),
+          apiProvider.overrideWithValue(
+            FakeSyncareApi()
+              ..onDischarge = (summary) async => const DischargeResult(
+                tier: 'HIGH',
+                score: 7,
+                label: 'demo-heuristic-v1',
+                disclaimer: 'Keluaran sintetis khusus pengujian.',
+              ),
+          ),
+        ],
+      );
+      addTearDown(scope.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: scope, child: const SynCareApp()),
+      );
+      await tester.pumpAndSettle();
+      await scope
+          .read(sessionControllerProvider.notifier)
+          .login('nurse', 'fixture');
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/account');
+      expect(find.byType(SessionAccountScreen), findsOneWidget);
+      scope.read(routerProvider).go('/account');
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/account');
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/nurse/intake');
+      expect(find.byType(NurseIntakeScreen), findsOneWidget);
+
+      await tester.enterText(
+        find.byType(TextField),
+        'Ringkasan pulang sintetis untuk pengujian navigasi.',
+      );
+      await tester.pump();
+      await tester.ensureVisible(find.text('Nilai ringkasan pulang'));
+      await tester.tap(find.text('Nilai ringkasan pulang'));
+      await tester.pumpAndSettle();
+      expect(find.text('Lanjut ke draf'), findsOneWidget);
+      await tester.ensureVisible(find.text('Lanjut ke draf'));
+      await tester.tap(find.text('Lanjut ke draf'));
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/nurse/draft');
+      expect(find.byType(NurseDraftScreen), findsOneWidget);
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/nurse/intake');
+      expect(find.byType(NurseDraftScreen), findsNothing);
+      expect(find.byType(NurseIntakeScreen), findsOneWidget);
+      expect(await tester.binding.handlePopRoute(), isFalse);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/nurse/intake');
+      expect(find.byType(NurseIntakeScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await scope.read(sessionControllerProvider.notifier).logout();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'logout from a pushed detail/account stack leaves login and Back cannot revive protected pages',
+    (tester) async {
+      final api = FakeSyncareApi();
+      api.onGetPatientOverview = (id) async => overviewFixture(id: id);
+      api.onListCheckins = (id, cursor) async => CheckinPage([
+        checkinFixture(id: 'report-a', patientId: id),
+      ], null);
+      api.onGetCheckin = (id) async =>
+          checkinFixture(id: id, patientId: 'record-a');
+      final scope = ProviderContainer(
+        overrides: [
+          sessionApiProvider.overrideWithValue(
+            FakeSessionApi()..onLogin = (id, _) async => grant(id),
+          ),
+          tokenSourceProvider.overrideWithValue(FakeTokenSource()),
+          apiProvider.overrideWithValue(api),
+        ],
+      );
+      addTearDown(scope.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: scope, child: const SynCareApp()),
+      );
+      await tester.pumpAndSettle();
+      await scope
+          .read(sessionControllerProvider.notifier)
+          .login('a', 'synthetic-component-password');
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Buka riwayat laporan'));
+      await tester.tap(find.text('Buka riwayat laporan'));
+      await tester.pumpAndSettle();
+      final report = find.text('Laporan 2026-10-25 07:00 WIB');
+      await tester.scrollUntilVisible(
+        report,
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(CheckinHistoryScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(report);
+      await tester.pumpAndSettle();
+      expect(find.byType(CheckinDetailScreen), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text('Akun'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/account');
+      expect(find.byType(SessionAccountScreen), findsOneWidget);
+      await tester.tap(find.text('Keluar'));
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/');
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(await tester.binding.handlePopRoute(), isFalse);
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/');
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(SessionAccountScreen), findsNothing);
+      expect(find.byType(CheckinDetailScreen), findsNothing);
+      expect(find.byType(PatientHomeScreen), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'system Back inside emergency confirmation dismisses only the dialog',
+    (tester) async {
+      var emergencyWrites = 0;
+      final api = FakeSyncareApi();
+      api.onGetPatientOverview = (id) async => overviewFixture(id: id);
+      api.onListEscalations = (id, cursor) async =>
+          EscalationPage([escalationFixture(patientId: id)], null);
+      api.onRequestEmergency = (_, _, _) async {
+        emergencyWrites++;
+        throw UnimplementedError('Back must not confirm the dialog');
+      };
+      final scope = ProviderContainer(
+        overrides: [
+          sessionApiProvider.overrideWithValue(
+            FakeSessionApi()..onLogin = (id, _) async => grant(id),
+          ),
+          tokenSourceProvider.overrideWithValue(FakeTokenSource()),
+          apiProvider.overrideWithValue(api),
+        ],
+      );
+      addTearDown(scope.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: scope, child: const SynCareApp()),
+      );
+      await tester.pumpAndSettle();
+      await scope
+          .read(sessionControllerProvider.notifier)
+          .login('a', 'synthetic-component-password');
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Buka status tindak lanjut'));
+      await tester.tap(find.text('Buka status tindak lanjut'));
+      await tester.pumpAndSettle();
+      expect(scope.read(routerProvider).state.uri.path, '/patient/alerts');
+      expect(find.byType(AlertHistoryScreen), findsOneWidget);
+      final scrollable = find
+          .descendant(
+            of: find.byType(AlertHistoryScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final reason = find.byType(TextField);
+      await tester.scrollUntilVisible(reason, 200, scrollable: scrollable);
+      await tester.pumpAndSettle();
+      await tester.enterText(reason, 'Sesak berat sintetis.');
+      await tester.scrollUntilVisible(
+        find.text('Minta bantuan segera'),
+        200,
+        scrollable: scrollable,
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Minta bantuan segera'));
+      await tester.tap(find.text('Minta bantuan segera'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Kirim permintaan ke perawat?'), findsOneWidget);
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(scope.read(routerProvider).state.uri.path, '/patient/alerts');
+      expect(find.byType(AlertHistoryScreen), findsOneWidget);
+      expect(emergencyWrites, 0);
       expect(tester.takeException(), isNull);
       await scope.read(sessionControllerProvider.notifier).logout();
       await tester.pumpAndSettle();

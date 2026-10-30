@@ -102,7 +102,7 @@ class BookingHistoryList extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             OutlinedButton(
-              onPressed: () => context.go('/patient/homecare'),
+              onPressed: () => context.push('/patient/homecare'),
               child: const Text('Lihat layanan homecare'),
             ),
           ],
@@ -130,7 +130,7 @@ class BookingHistoryList extends StatelessWidget {
                   ),
                 const SizedBox(height: 16),
                 OutlinedButton(
-                  onPressed: () => context.go(
+                  onPressed: () => context.push(
                     '/patient/bookings/${Uri.encodeComponent(booking.id)}',
                   ),
                   child: const Text('Buka detail booking'),

@@ -79,6 +79,11 @@ ends the local session and returns to sign-in. Deep links to `/patient/*` requir
 and `/nurse/*` requires a nurse session; a signed-in account with the wrong role is redirected to
 the account screen.
 
+Normal page navigation pushes onto a stack. Android Back returns to the previous screen, dismissing
+an open dialog first. Selecting the home tab clears the navigation stack. A secondary deep link
+opened without history returns to the role's home screen on Back: patient Ringkasan or nurse intake.
+Back at home or sign-in can exit the app. Logout removes protected pages from the stack.
+
 | Concern | Implementation |
 |---|---|
 | UI | Flutter, Material 3, Indonesian-language interface |

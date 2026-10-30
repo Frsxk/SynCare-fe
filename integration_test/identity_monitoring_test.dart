@@ -89,10 +89,7 @@ void main() {
         }
         scope.read(routerProvider).go('/nurse/approval');
         await tester.pumpAndSettle();
-        expect(
-          scope.read(routerProvider).routeInformationProvider.value.uri.path,
-          '/account',
-        );
+        expect(scope.read(routerProvider).state.uri.path, '/account');
         if (fixture['phase'] != 'smoke') {
           final baseline = account['baseline'] as Map<String, dynamic>;
           expect(

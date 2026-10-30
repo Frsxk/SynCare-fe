@@ -100,7 +100,7 @@ class HomecareCatalogList extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             OutlinedButton(
-              onPressed: () => context.go('/patient/bookings'),
+              onPressed: () => context.push('/patient/bookings'),
               child: const Text('Buka booking saya'),
             ),
             const SizedBox(height: 24),
@@ -149,7 +149,7 @@ class HomecareCatalogList extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
-                  onPressed: () => context.go(
+                  onPressed: () => context.push(
                     '/patient/homecare/${Uri.encodeComponent(service.id)}/request',
                   ),
                   child: const Text('Ajukan kunjungan'),

@@ -146,7 +146,7 @@ class AlertHistoryList extends StatelessWidget {
             Text(alert.reason),
             const SizedBox(height: 16),
             OutlinedButton(
-              onPressed: () => context.go(
+              onPressed: () => context.push(
                 '/patient/alerts/${Uri.encodeComponent(alert.id)}',
               ),
               child: const Text('Buka detail tindak lanjut'),
@@ -275,7 +275,13 @@ class AlertDetailContent extends StatelessWidget {
         child: const Text('Muat ulang status tindak lanjut'),
       ),
       OutlinedButton(
-        onPressed: () => context.go('/patient/alerts'),
+        onPressed: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go('/patient/alerts');
+          }
+        },
         child: const Text('Kembali ke tindak lanjut saya'),
       ),
     ],

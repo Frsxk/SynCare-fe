@@ -52,7 +52,7 @@ class EmergencyNotice extends ConsumerWidget {
                 ),
                 if (source == 'F2')
                   OutlinedButton(
-                    onPressed: () => context.go('/patient/alerts'),
+                    onPressed: () => context.push('/patient/alerts'),
                     child: const Text('Buka status tindak lanjut'),
                   ),
                 const SizedBox(height: 16),

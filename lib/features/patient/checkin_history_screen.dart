@@ -82,7 +82,7 @@ class CheckinHistoryList extends StatelessWidget {
             if (page.records.isEmpty)
               const Text('Belum ada laporan tersimpan.'),
             OutlinedButton(
-              onPressed: () => context.go('/patient/checkin'),
+              onPressed: () => context.push('/patient/checkin'),
               child: const Text('Tulis check-in'),
             ),
           ],
@@ -109,7 +109,7 @@ class CheckinHistoryRow extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsetsDirectional.symmetric(vertical: 12),
     child: OutlinedButton(
-      onPressed: () => context.go('/patient/checkins/${record.id}'),
+      onPressed: () => context.push('/patient/checkins/${record.id}'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: 8,

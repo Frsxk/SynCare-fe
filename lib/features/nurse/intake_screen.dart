@@ -348,7 +348,7 @@ class _ResultView extends StatelessWidget {
         _NotValidatedBlock(result: result),
         const SizedBox(height: 24),
         FilledButton.icon(
-          onPressed: () => context.go('/nurse/draft'),
+          onPressed: () => context.push('/nurse/draft'),
           icon: const Icon(Icons.arrow_forward),
           label: const Text('Lanjut ke draf'),
         ),

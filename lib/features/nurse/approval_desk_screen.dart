@@ -561,7 +561,7 @@ class _NurseApprovalDeskScreenState
           child: SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () => context.go('/nurse/draft'),
+              onPressed: () => context.push('/nurse/draft'),
               icon: const Icon(Icons.arrow_forward),
               label: const Text('Ke draf'),
             ),
@@ -1003,7 +1003,13 @@ class _NurseApprovalDeskScreenState
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: () => context.go('/nurse/draft'),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/nurse/draft');
+              }
+            },
             icon: const Icon(Icons.arrow_back),
             label: const Text('Kembali ke draf'),
           ),

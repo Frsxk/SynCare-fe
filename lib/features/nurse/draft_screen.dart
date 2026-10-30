@@ -447,7 +447,7 @@ class _DraftResultCard extends StatelessWidget {
             const SizedBox(height: 20),
             FilledButton.icon(
               key: const Key('draft-to-approval'),
-              onPressed: () => context.go('/nurse/approval'),
+              onPressed: () => context.push('/nurse/approval'),
               icon: const Icon(Icons.fact_check_outlined),
               label: const Text('Lanjut ke meja persetujuan'),
             ),

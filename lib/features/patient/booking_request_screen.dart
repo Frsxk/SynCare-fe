@@ -103,7 +103,7 @@ class _BookingRequestScreenState extends ConsumerState<BookingRequestScreen> {
         children: [
           BookingReceipt(booking: booking),
           OutlinedButton(
-            onPressed: () => context.go(
+            onPressed: () => context.push(
               '/patient/bookings/${Uri.encodeComponent(booking.id)}',
             ),
             child: const Text('Lihat status booking'),
@@ -175,7 +175,13 @@ class _BookingRequestScreenState extends ConsumerState<BookingRequestScreen> {
                 ],
                 const SizedBox(height: 16),
                 OutlinedButton(
-                  onPressed: () => context.go('/patient/homecare'),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/patient/homecare');
+                    }
+                  },
                   child: const Text('Kembali ke layanan'),
                 ),
               ],

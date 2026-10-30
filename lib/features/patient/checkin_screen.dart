@@ -161,7 +161,7 @@ class _PatientCheckinScreenState extends ConsumerState<PatientCheckinScreen> {
                   ),
                 const SizedBox(height: 16),
                 OutlinedButton(
-                  onPressed: () => context.go('/patient/checkins'),
+                  onPressed: () => context.push('/patient/checkins'),
                   child: const Text('Buka riwayat laporan'),
                 ),
               ],

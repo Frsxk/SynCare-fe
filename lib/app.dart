@@ -59,14 +59,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/account',
-        builder: (_, _) => const SessionAccountScreen(),
+        builder: (_, _) =>
+            const _BackToHome(child: SessionAccountScreen()),
       ),
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) =>
-            AppShell(
-              key: ValueKey(ref.read(sessionControllerProvider).generation),
-              location: state.uri.path,
-              child: child,
+            _BackToHome(
+              child: AppShell(
+                key: ValueKey(ref.read(sessionControllerProvider).generation),
+                location: GoRouter.of(context).state.uri.path,
+                child: child,
+              ),
             ),
         routes: <RouteBase>[
           GoRoute(
@@ -161,6 +164,32 @@ final routerProvider = Provider<GoRouter>((ref) {
   });
   return router;
 });
+
+class _BackToHome extends ConsumerWidget {
+  const _BackToHome({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionControllerProvider);
+    if (session is! SessionAuthenticated) return child;
+    final home = session.session.principal.role == 'patient'
+        ? '/patient/home'
+        : '/nurse/intake';
+    final router = GoRouter.of(context);
+    return ListenableBuilder(
+      listenable: router.routerDelegate,
+      builder: (context, _) => PopScope<Object?>(
+        canPop: router.state.uri.path == home || router.canPop(),
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && !router.canPop()) router.go(home);
+        },
+        child: child,
+      ),
+    );
+  }
+}
 
 class SynCareApp extends ConsumerWidget {
   const SynCareApp({super.key});

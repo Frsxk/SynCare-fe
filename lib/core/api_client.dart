@@ -120,6 +120,7 @@ class ApiClient implements SyncareApi {
         final response = await _dio.get<Object?>(
           '/api/v1/patients/${Uri.encodeComponent(patientId)}/alerts',
           queryParameters: {'limit': 20, 'cursor': ?cursor},
+          options: Options(headers: {'X-SynCare-Alert-Sources': 'all'}),
         );
         final page = EscalationPage.fromJson(_decodeData(response.data));
         if (page.alerts.any((a) => a.patientId != patientId)) {

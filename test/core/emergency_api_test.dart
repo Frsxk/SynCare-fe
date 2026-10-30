@@ -7,6 +7,19 @@ import '../helpers/escalation_fixture.dart';
 import '../helpers/fakes.dart';
 
 void main() {
+  test('alert history opts into patient-request sources without changing auth', () async {
+    final dio = Dio();
+    final client = ApiClient(baseUrl: 'http://syncare.test', tokenSource: FakeTokenSource('synthetic-session'), dio: dio);
+    final wire = DioAdapter(dio: dio);
+    addTearDown(() => dio.close(force: true));
+    final captured = <RequestOptions>[];
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) { captured.add(options); handler.next(options); }));
+    wire.onGet('/api/v1/patients/patient-a/alerts', (server) => server.reply(200, {'data': <Object>[], 'nextCursor': null}), queryParameters: {'limit': 20});
+    await client.listEscalations('patient-a');
+    expect(captured.single.headers['X-SynCare-Alert-Sources'], 'all');
+    expect(captured.single.headers['Authorization'], 'Bearer synthetic-session');
+  });
+
   test(
     'Dio emergency POST uses own patient route, exact reason body, bearer auth and UUID idempotency header',
     () async {

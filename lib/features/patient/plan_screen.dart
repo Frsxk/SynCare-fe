@@ -185,14 +185,15 @@ class LegacyPatientPlanScreen extends ConsumerWidget {
       body: SafeArea(
         top: false,
         child: ContentWidth(
-          child: Column(
-            children: <Widget>[
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: DisclaimerBanner(),
-              ),
-              Expanded(
-                child: asyncPlan.when(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: DisclaimerBanner(),
+                ),
+                asyncPlan.when(
                   loading: () => const _PlanLoading(),
                   error: (Object error, StackTrace stackTrace) {
                     if (error is NotFoundException) {
@@ -213,10 +214,10 @@ class LegacyPatientPlanScreen extends ConsumerWidget {
                     );
                   },
                   data: (ApprovedPlanRecord record) =>
-                      _PlanDetails(record: record),
+                      _PlanDetails(record: record, embedded: true),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -209,58 +209,55 @@ void main() {
     'renders plan steps as separate accessible items without splitting the medication clause',
     (tester) async {
       final semantics = tester.ensureSemantics();
-      addTearDown(semantics.dispose);
-      await _pumpPlan(tester, _record());
+      try {
+        await _pumpPlan(tester, _record());
 
-      expect(find.text(_narrative), findsNothing);
+        expect(find.text(_narrative), findsNothing);
 
-      final Finder planCard = find.ancestor(
-        of: find.text('Rencana tindak lanjut'),
-        matching: find.byType(Card),
-      );
-      expect(
-        find.descendant(
-          of: planCard,
-          matching: find.text('Draf tindak lanjut.'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: planCard,
-          matching: find.text('Diagnosis tercatat: demam berdarah dengue.'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: planCard, matching: find.text(_medicationClause)),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: planCard,
-          matching: find.text('Check-in setiap 2 hari.'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: planCard,
-          matching: find.text('Kunjungan rawat jalan dalam 7 hari.'),
-        ),
-        findsOneWidget,
-      );
+        final Finder planCard = find.ancestor(
+          of: find.text('Rencana tindak lanjut'),
+          matching: find.byType(Card),
+        );
+        expect(
+          find.descendant(
+            of: planCard,
+            matching: find.text('Draf tindak lanjut.'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: planCard,
+            matching: find.text('Diagnosis tercatat: demam berdarah dengue.'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: planCard, matching: find.text(_medicationClause)),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: planCard,
+            matching: find.text('Check-in setiap 2 hari.'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: planCard,
+            matching: find.text('Kunjungan rawat jalan dalam 7 hari.'),
+          ),
+          findsOneWidget,
+        );
 
-      // The medication clause stays whole: no dangling `oralit.` bullet.
-      expect(find.text('oralit.'), findsNothing);
-      expect(
-        find.bySemanticsLabel(_medicationClause),
-        findsOneWidget,
-      );
-      expect(
-        find.bySemanticsLabel('Check-in setiap 2 hari.'),
-        findsWidgets,
-      );
+        // The medication clause stays whole: no dangling `oralit.` bullet.
+        expect(find.text('oralit.'), findsNothing);
+        expect(find.bySemanticsLabel(_medicationClause), findsOneWidget);
+        expect(find.bySemanticsLabel('Check-in setiap 2 hari.'), findsWidgets);
+      } finally {
+        semantics.dispose();
+      }
     },
   );
 

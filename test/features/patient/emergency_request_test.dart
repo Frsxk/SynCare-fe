@@ -283,18 +283,24 @@ void main() {
     },
   );
 
-  testWidgets('copy and controls survive 320dp at 200 percent text', (tester) async {
+  testWidgets('copy and controls survive 320dp at 200 percent text', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(320, 800);
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    var calls = 0;
     final api = FakeSyncareApi()
-      ..onRequestEmergency = (_, _, _) async => EmergencyRequestResult(
-        alert: patientRequestFixture(),
-        replayed: false,
-      );
+      ..onRequestEmergency = (_, _, _) async {
+        calls++;
+        return EmergencyRequestResult(
+          alert: patientRequestFixture(),
+          replayed: false,
+        );
+      };
     final controller = EmergencyRequestController(api, 'patient-a');
     await tester.pumpWidget(_panel(controller));
     await tester.pumpAndSettle();
@@ -304,11 +310,40 @@ void main() {
       ),
       findsOneWidget,
     );
+    final field = find.byType(TextField);
+    await tester.ensureVisible(field);
+    await tester.pumpAndSettle();
+    // An empty reason is rejected before any confirmation dialog or POST.
+    await tester.ensureVisible(find.text('Minta bantuan segera'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Minta bantuan segera'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(
+      find.text('Tulis alasan permintaan terlebih dahulu.'),
+      findsOneWidget,
+    );
+    expect(calls, 0);
+    // Valid text still requires the explicit confirmation; cancel sends none.
+    await tester.ensureVisible(field);
+    await tester.enterText(field, 'Sesak berat sejak tadi.');
     await tester.ensureVisible(find.text('Minta bantuan segera'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Minta bantuan segera'));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('Kirim permintaan ke perawat?'), findsOneWidget);
+    expect(find.text('Ya, kirim permintaan').hitTestable(), findsOneWidget);
+    expect(find.text('Batal').hitTestable(), findsOneWidget);
+    expect(calls, 0);
+    await tester.tap(find.text('Batal'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(calls, 0);
+    expect(
+      tester.widget<TextField>(field).controller!.text,
+      'Sesak berat sejak tadi.',
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -337,16 +372,62 @@ void main() {
               (_) => AlertHistory(api, 'patient-a')..load(),
             ),
             emergencyRequestProvider.overrideWith((_) => requestController),
-            emergencyGuidanceProvider.overrideWith((_) async => guidanceFixture),
+            emergencyGuidanceProvider.overrideWith(
+              (_) async => guidanceFixture,
+            ),
           ],
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('Laporan:'), findsOneWidget);
-      expect(find.textContaining('Permintaan darurat:'), findsOneWidget);
+      expect(find.text('Minta bantuan segera'), findsWidgets);
+      final list = find.byType(Scrollable).first;
+      final f2Row = find.byKey(const ValueKey('alert-a'));
+      final requestRow = find.byKey(const ValueKey('alert-request-a'));
+      // The rows follow the emergency header, so they are lazily built only
+      // after the patient scrolls the real history list.
+      await tester.scrollUntilVisible(
+        find.textContaining('Laporan:'),
+        250,
+        scrollable: list,
+      );
+      await tester.pumpAndSettle();
+      expect(f2Row, findsOneWidget);
+      expect(
+        find.descendant(of: f2Row, matching: find.textContaining('Laporan:')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: f2Row,
+          matching: find.textContaining('Permintaan darurat:'),
+        ),
+        findsNothing,
+      );
       expect(find.textContaining('report-a'), findsNothing);
       expect(find.textContaining('attempt-a'), findsNothing);
-      expect(find.text('Minta bantuan segera'), findsWidgets);
+      await tester.scrollUntilVisible(
+        find.textContaining('Permintaan darurat:'),
+        250,
+        scrollable: list,
+      );
+      await tester.pumpAndSettle();
+      expect(requestRow, findsOneWidget);
+      expect(
+        find.descendant(
+          of: requestRow,
+          matching: find.textContaining('Permintaan darurat:'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: requestRow,
+          matching: find.textContaining('Laporan:'),
+        ),
+        findsNothing,
+      );
+      expect(find.textContaining('report-a'), findsNothing);
+      expect(find.textContaining('attempt-a'), findsNothing);
     },
   );
 

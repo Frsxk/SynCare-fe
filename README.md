@@ -201,7 +201,7 @@ flutter build appbundle --release \
   --dart-define=API_BASE=https://syncare.trackover.web.id
 ```
 
-The app version comes from `pubspec.yaml` (`1.0.0+1` by default). Override it with `--build-name`
+The app version comes from `pubspec.yaml` (`1.0.1+2` by default). Override it with `--build-name`
 and `--build-number`. These commands produce build artifacts only; store listing, device
 certification, and submission are separate deployment steps.
 
